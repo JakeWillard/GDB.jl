@@ -1,0 +1,13 @@
+name = "GDB"
+uuid = "09d06384-8f3f-4695-8f96-c6ba44c2b415"
+authors = ["Jake Willard"]
+version = "0.1.0"
+
+[compat]
+julia = "1"
+
+[extras]
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+
+[targets]
+test = ["Test"]
