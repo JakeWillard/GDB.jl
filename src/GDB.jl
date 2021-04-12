@@ -1,5 +1,12 @@
 module GDB
 
-# Write your package code here.
+export test_simulation
+
+# have placeholder test_simulation for now
+function test_simulation()
+
+    return True
+end
+
 
 end
