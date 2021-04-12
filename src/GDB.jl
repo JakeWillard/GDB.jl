@@ -5,7 +5,7 @@ export test_simulation
 # have placeholder test_simulation for now
 function test_simulation()
 
-    return True
+    return true
 end
 
 
