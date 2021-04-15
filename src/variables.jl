@@ -4,7 +4,7 @@ abstract type ModelVariable end
 abstract type Temp <: ModelVariable end
 abstract type Density <: ModelVariable end
 
-struct Variable{T<:ModelVariable}
+mutable struct Variable{T<:ModelVariable}
 
     value::Matrix{Float64}
     x::Matrix{Float64}
@@ -17,7 +17,7 @@ struct Variable{T<:ModelVariable}
 end
 
 
-function Variable{T}(value::Matrix{Float64}) where {T}
+function Variable{T}(value::Matrix{Float64}) where {T<:ModelVariable}
     blank = zeros(Float64, size(value))
     return Variable{T}(value, blank, blank, blank, blank, blank, blank)
 end
