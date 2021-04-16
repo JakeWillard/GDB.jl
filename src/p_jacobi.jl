@@ -25,14 +25,11 @@ function dist_jacobi(A::SparseMatrixCSC, x::Vector{Float64}, b::Vector{Float64};
     err = 1.0
     while err > 1e-8
         for dummy=1:N
-            # x = @distributed (+) for i=1:chunks-1
-            #     relax(M, x, f, nodes[i], nodes[i+1], n)
-            # end
             xnext[:] = sum(pmap(i -> relax(M, x, f, nodes[i], nodes[i+1], n), 1:chunks-1))
         end
         err = norm(xnext - x)
-        println(err)
         x[:] = xnext[:]
+        err = 0.0
     end
     return x
 
