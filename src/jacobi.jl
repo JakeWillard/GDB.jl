@@ -1,0 +1,22 @@
+
+function jacobi(A::SparseMatrixCSC, x::Vector{Float64}, b::Vector{Float64}; a=1.0, N=100, n=10, chunks=5)
+
+    Dinv = a*inv(Diagonal(A))
+    L = -tril(A, -1)
+    U = -triu(A, 1)
+
+    M = Dinv * (L + U)
+    f = Dinv * b
+
+    # XXX: assuming for now that size(A) evenly divides chunks
+    chunksize = Int(ceil(size(A)[1] / chunks))
+    err = 1.0
+
+    while err > 1e-8
+        for dummy=1:N
+            x = M * x + f
+        end
+        err = norm(x - M * x - f)
+    end
+    return x
+end
