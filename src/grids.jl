@@ -1,7 +1,8 @@
 
 
-# WARNING: This does what its supposed to do but I don't think its
+# NOTE: This does what its supposed to do but I don't think its
 # a good idea to use it actually.
+# NOTE: I just copied this from wikipedia, not sure how it actually works
 function hilbert_curve(d::Int, n::Int)
 
     t = d
