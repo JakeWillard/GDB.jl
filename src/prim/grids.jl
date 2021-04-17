@@ -9,10 +9,9 @@ struct Grid
 end
 
 
-function Grid(inside::Function, n::Int)
+function Grid(inside::Function, Nx::Int, Ny::Int)
 
-    N = 2^n
-    Nx = Int(sqrt(N))
+    N = Nx * Ny
     Nk = 0
     points = zeros(Float64, (2, N))
 
@@ -21,7 +20,7 @@ function Grid(inside::Function, n::Int)
     proj_vals = ones(Int32, N)
 
     for i=1:Nx
-        for j=1:Nx
+        for j=1:Ny
             x = i / Nx
             y = j / Nx
             if inside([x, y])
@@ -37,4 +36,13 @@ function Grid(inside::Function, n::Int)
 
     return Grid(points, P, Pinv)
 
+end
+
+
+# might be nice to construct 2^n x 2^n sized grids
+function Grid(inside::Function, n::Int)
+
+    N = 2^n
+    Nx = Int(sqrt(N))
+    return Grid(inside, Nx, Nx)
 end
