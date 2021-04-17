@@ -1,8 +1,6 @@
 
 
 abstract type ModelVariable end
-abstract type Temp <: ModelVariable end
-abstract type Density <: ModelVariable end
 
 mutable struct Variable{T<:ModelVariable}
 
