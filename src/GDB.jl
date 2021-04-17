@@ -2,7 +2,7 @@ module GDB
 
 export test_simulation, Variable, Density, Temp
 export jacobi, laplacian2d, dist_jacobi
-export hilbert
+export Grid
 
 using Distributed
 @everywhere using LinearAlgebra
