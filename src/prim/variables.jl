@@ -1,8 +1,8 @@
 
 
-abstract type ModelVariable end
+abstract type Physical end
 
-mutable struct Variable{T<:ModelVariable}
+mutable struct Variable{T<:Physical}
 
     value::Matrix{Float64}
     x::Matrix{Float64}
@@ -15,7 +15,7 @@ mutable struct Variable{T<:ModelVariable}
 end
 
 
-function Variable{T}(value::Matrix{Float64}) where {T<:ModelVariable}
+function Variable{T}(value::Matrix{Float64}) where {T<:Physical}
     blank = zeros(Float64, size(value))
     return Variable{T}(value, blank, blank, blank, blank, blank, blank)
 end
