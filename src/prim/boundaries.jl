@@ -5,9 +5,9 @@
 struct Boundary
 
     pen::Vector{Float64}
-    PEN::SparseMatrixCSC
+    PEN::Diagonal
     REF::SparseMatrixCSC
-    
+
 end
 
 

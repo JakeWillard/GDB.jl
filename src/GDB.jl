@@ -13,6 +13,8 @@ include("./prim/jacobi.jl")
 include("./prim/physical.jl")
 include("./prim/boundaries.jl")
 
+include("./models/rmhd.jl")
+
 
 # have placeholder test_simulation for now
 function test_simulation()
