@@ -11,6 +11,11 @@ struct Boundary
 end
 
 
+function Boundary(p::Function, r::Function, grid::Grid)
+
+end
+
+
 
 
 # penalize vector in favor of another vector

@@ -60,3 +60,28 @@ function laplacian(grid::Grid)
 
     return Dxx + alpha * Dyy
 end
+
+
+function interpolation_row(x, y, grid::Grid)
+
+    Minv = grid.xy_stencil
+    mx = size(grid.x_stencil)[1]
+    my = size(grid.y_steincil)[2]
+
+    x_ind = div(x, grid.dx)
+    y_ind = div(y, grid.dy)
+    xr = (x - grid.dx*x_ind) / grid.dx
+    yr = (y - grid.dy*y_ind) / grid.dy
+
+    v = zeros(Float64, (1, mx*my))
+    for i=1:mx
+        for j=1:my
+            a = xr^(i-1) / factorial(i-1)
+            b = yr^(j-1) / factorial(j-1)
+            v[1,i + mx*(j-1)] = a*b
+        end
+    end
+
+    dat = v * Minv
+
+end

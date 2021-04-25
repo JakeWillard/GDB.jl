@@ -10,6 +10,7 @@ struct Grid
     Nk::Int32
     x_stencil::Matrix{Float64}
     y_stencil::Matrix{Float64}
+    xy_stencil::Matrix{Float64}
     dx::Float64
     dy::Float64
 
@@ -25,6 +26,32 @@ function stencil(m::Int)
             M[i, j] = (i - ic)^(j-1) / factorial(j-1)
         end
     end
+    return inv(M)
+end
+
+
+function stencil2d(mx::Int, my::Int)
+
+    ic = Int(ceil(mx/2.0))
+    jc = Int(ceil(my/2.0))
+
+
+    M = zeros((mx*my, mx*my))
+    for i=1:mx
+        for j=1:my
+            for ii=1:mx
+                for jj=1:my
+                    row = i + mx*(j-1)
+                    col = ii + mx*(jj-1)
+
+                    a = (i-ic)^(ii-1) / factorial(ii-1)
+                    b = (j-jc)^(jj-1) / factorial(jj-1)
+                    M[row, col] = a*b
+                end
+            end
+        end
+    end
+
     return inv(M)
 end
 
@@ -60,7 +87,8 @@ function Grid(inside::Function, Nx::Int, Ny::Int, mx::Int, my::Int)
     # compute stencils
     x_stencil = stencil(mx)
     y_stencil = stencil(my)
+    xy_stencil = stencil2d(mx, my)
 
 
-    return Grid(points, P, Pinv, Nx, Ny, Nk, x_stencil, y_stencil, dx, dy)
+    return Grid(points, P, Pinv, Nx, Ny, Nk, x_stencil, y_stencil, xy_stencil, dx, dy)
 end
