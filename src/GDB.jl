@@ -7,6 +7,13 @@ using LinearAlgebra
 using SparseArrays
 
 
+include("./prim/grids.jl")
+include("./prim/matrices.jl")
+include("./prim/jacobi.jl")
+include("./prim/physical.jl")
+include("./prim/boundaries.jl")
+
+
 # have placeholder test_simulation for now
 function test_simulation()
 

@@ -1,5 +1,4 @@
 
-
 function relax(M, x, f, i, j, n)
 
     out = zeros(Float64, size(x))
@@ -35,23 +34,4 @@ function p_jacobi(A::SparseMatrixCSC, x::Vector{Float64}, b::Vector{Float64}, w:
     return x
 
 
-end
-
-
-struct LinearSystem{T<:Physical}
-
-    A::SparseMatrixCSC
-    b::Vector{Float64}
-    weight::Float64
-    N::Int
-    n::Int
-    chunks::Int
-    threshold::Float64
-
-end
-
-
-function solve(x0::Vector{Float64}, lin::LinearSystem)
-
-    return p_jacobi(lin.A, x0, lin.b, lin.weight, lin.N, lin.n, lin.chunks, lin.threshold)
 end
