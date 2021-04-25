@@ -3,7 +3,7 @@ abstract type Physical end
 
 mutable struct Variable{T<:Physical}
 
-    value::Matrix{Float64}
+    value::Array{Float64, 3}
     x::Matrix{Float64}
     xx::Matrix{Float64}
     xy::Matrix{Float64}
@@ -14,27 +14,31 @@ mutable struct Variable{T<:Physical}
 end
 
 
-function Variable{T}(value::Matrix{Float64}) where {T<:Physical}
-    blank = zeros(Float64, size(value))
+function Variable{T}(v0::Vector{Float64}, Nz::Int) where {T<:Physical}
+
+    Nk = length(v0)
+    value = zeros(Float64, (Nk, Nz, 3))
+    for i=1:Nz
+        for j=1:3
+            value[:,i,j] = v0[:]
+        end
+    end
+
+    blank = zeros(Float64, (Nk, Nz))
     return Variable{T}(value, blank, blank, blank, blank, blank, blank)
 end
 
 
+function Variable{T}(f::Function, Nz::Int, grid::Grid) where {T<:Physical}
 
-struct LinearSystem{T<:Physical}
+    Nk = grid.Nk
+    v0 = zeros(Float64, Nk)
 
-    A::SparseMatrixCSC
-    b::Vector{Float64}
-    weight::Float64
-    N::Int
-    n::Int
-    chunks::Int
-    threshold::Float64
+    for k=1:Nk
+        x = grid.points[1,k]
+        y = grid.points[2,k]
+        v0[k] = f(x, y)
+    end
 
-end
-
-
-function solve(x0::Vector{Float64}, lin::LinearSystem)
-
-    return p_jacobi(lin.A, x0, lin.b, lin.weight, lin.N, lin.n, lin.chunks, lin.threshold)
+    return Variable{T}(v0, Nz)
 end
