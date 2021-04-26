@@ -61,8 +61,8 @@ end
 function partial_t!(n::Variable{Density}, phi::Variable{StreamFunction}, t, b::Boundary)
 
     n_t = phi.x .* n.y .- phi.y .* n.x
-    # n_ref = b.REF * n.value[:,:,t]
-    # n_t = penalize(n_t, n.value[:,:,t] .+ n_ref, b)
+    n_ref = b.REF * n.value[:,:,t]
+    n_t = penalize(n_t, n.value[:,:,t] .+ n_ref, b)
     n.t = n_t
 end
 
@@ -104,8 +104,8 @@ function simulation(n0::Function, phi0::Function, Nt, N, Ng)
     n = Variable{Density}(n0, 1, grid)
     phi = Variable{StreamFunction}(phi0, 1, grid)
 
-    Dx = x_derivative(1, grid)
-    Dy = y_derivative(1, grid)
+    Dx = x_derivative(2, grid)
+    Dy = y_derivative(2, grid)
     L = laplacian(grid)
 
     partial_x!(phi, 2, Dx, grid.dx)

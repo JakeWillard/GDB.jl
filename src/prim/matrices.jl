@@ -6,7 +6,7 @@ function x_derivative(n, grid::Grid)
 
     Dx = sparse(zeros(Float64, (Nx, Nx)))
     Iy = sparse(I, Ny, Ny)
-    stencil = grid.x_stencil[n,:]
+    stencil = grid.x_stencil[n+1,:]
     m = length(stencil)
     ic = Int(ceil(m/2.0))
 
@@ -31,7 +31,7 @@ function y_derivative(n, grid::Grid)
 
     Dy = sparse(zeros(Float64, (Ny, Ny)))
     Ix = sparse(I, Nx, Nx)
-    stencil = grid.y_stencil[n,:]
+    stencil = grid.y_stencil[n+1,:]
     m = length(stencil)
     ic = Int(ceil(m/2.0))
 
