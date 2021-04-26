@@ -42,3 +42,20 @@ function Variable{T}(f::Function, Nz::Int, grid::Grid) where {T<:Physical}
 
     return Variable{T}(v0, Nz)
 end
+
+
+function to_readable(var::Variable, grid::Grid)
+
+    vals = grid.inverse_projection * var.value[:,:,2]
+
+    Nx = grid.Nx
+    Ny = grid.Ny
+    Nz = size(vals)[2]
+    out = zeros(Float64, (grid.Nx, grid.Ny, Nz))
+
+    for j=1:Ny
+        out[:,j,:] = vals[1+(j-1)*Nx:j*Nx,:]
+    end
+
+    return out
+end
