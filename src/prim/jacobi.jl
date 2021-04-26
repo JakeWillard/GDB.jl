@@ -15,6 +15,7 @@ function p_jacobi(A::SparseMatrixCSC, x::Vector{Float64}, b::Vector{Float64}, w:
     Dinv = w*inv(Diagonal(A))
     L = -tril(A, -1)
     U = -triu(A, 1)
+    bnorm = norm(b)
 
     M = Dinv * (L + U)
     f = Dinv * b
@@ -27,7 +28,7 @@ function p_jacobi(A::SparseMatrixCSC, x::Vector{Float64}, b::Vector{Float64}, w:
         for dummy=1:N
             xnext[:] = sum(pmap(i -> relax(M, x, f, nodes[i], nodes[i+1], n), 1:chunks-1))
         end
-        err = norm(xnext - x)
+        err = norm(xnext - x) / bnorm
         x[:] = xnext[:]
         err = 0.0
     end

@@ -3,9 +3,8 @@ function x_derivative(n, grid::Grid)
 
     Nx = grid.Nx
     Ny = grid.Ny
-    N = Nx*Ny
 
-    Dx = sparse(zeros(Float64, (N, N)))
+    Dx = sparse(zeros(Float64, (Nx, Nx)))
     Iy = sparse(I, Ny, Ny)
     stencil = grid.x_stencil[n,:]
     m = length(stencil)
@@ -29,9 +28,8 @@ function y_derivative(n, grid::Grid)
 
     Nx = grid.Nx
     Ny = grid.Ny
-    N = Nx*Ny
 
-    Dy = sparse(zeros(Float64, (N, N)))
+    Dy = sparse(zeros(Float64, (Ny, Ny)))
     Ix = sparse(I, Nx, Nx)
     stencil = grid.y_stencil[n,:]
     m = length(stencil)

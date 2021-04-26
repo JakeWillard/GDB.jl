@@ -73,7 +73,7 @@ function Grid(inside::Function, Nx::Int, Ny::Int, mx::Int, my::Int)
         for j=1:Ny
             x = i / Nx
             y = j / Nx
-            if inside([x, y])
+            if inside(x, y)
                 Nk += 1
                 points[:,Nk] = [x, y]
                 proj_cols[Nk] = i + Nx*(j-1)

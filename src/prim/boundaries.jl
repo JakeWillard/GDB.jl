@@ -16,16 +16,20 @@ function Boundary(p::Function, r::Function, grid::Grid)
 end
 
 
-
-
-# penalize vector in favor of another vector
 function penalize(v1::Vector{Float64}, v2::Vector{Float64}, pen::Vector{Float64})
 
-    return v1 .* (1 .- pen) .+ pen .* v2
+    P = Diagonal(pen)
+    return (I - P) * v1 + P * v2
 end
 
 
-# penalize operator in favor of another operator
+function penalize(v1::Matrix{Float64}, v2::Matrix{Float64}, pen::Vector{Float64})
+
+    P = Diagonal(pen)
+    return (I - P) * v1 + P * v2
+end
+
+
 function penalize(A::SparseMatrixCSC, B::SparseMatrixCSC, pen::Vector{Float64})
 
     P = Diagonal(pen)
@@ -34,7 +38,7 @@ end
 
 
 # penalization given boundary
-function penalize(v1::Vector{Float64}, v2::Vector{Float64}, b::Boundary)
+function penalize(v1::Matrix{Float64}, v2::Matrix{Float64}, b::Boundary)
 
     return penalize(v1, v2, b.pen)
 end
