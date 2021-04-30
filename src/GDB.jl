@@ -6,7 +6,7 @@ using Distributed
 using LinearAlgebra
 using SparseArrays
 
-
+include("./prim/splines.jl")
 include("./prim/grids.jl")
 include("./prim/matrices.jl")
 include("./prim/jacobi.jl")

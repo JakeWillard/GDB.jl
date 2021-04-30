@@ -8,9 +8,9 @@ struct Grid
     Nx::Int32
     Ny::Int32
     Nk::Int32
-    x_stencil::Matrix{Float64}
-    y_stencil::Matrix{Float64}
-    xy_stencil::Matrix{Float64}
+    Mxinv::Matrix{Float64}
+    Myinv::Matrix{Float64}
+    MxyinvT::Matrix{Float64}
     dx::Float64
     dy::Float64
 
@@ -85,10 +85,10 @@ function Grid(inside::Function, Nx::Int, Ny::Int, mx::Int, my::Int)
     Pinv = transpose(P)
 
     # compute stencils
-    x_stencil = stencil(mx)
-    y_stencil = stencil(my)
-    xy_stencil = stencil2d(mx, my)
+    Mxinv = stencil1d(mx)
+    Myinv = stencil1d(my)
+    MxyinvT = stencil2d(mx, my)
 
 
-    return Grid(points, P, Pinv, Nx, Ny, Nk, x_stencil, y_stencil, xy_stencil, dx, dy)
+    return Grid(points, P, Pinv, Nx, Ny, Nk, Mxinv, Myinv, MxyinvT, dx, dy)
 end
