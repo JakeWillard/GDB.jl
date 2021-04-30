@@ -60,26 +60,31 @@ function laplacian(grid::Grid)
 end
 
 
+
 function interpolation_row(x, y, grid::Grid)
 
-    Minv = grid.xy_stencil
-    mx = size(grid.x_stencil)[1]
-    my = size(grid.y_steincil)[2]
+    return interpolation_row(x, y, grid.MxyinvT, grid.Nx, grid.Ny, grid.mx, grid,my)
+end
 
-    x_ind = div(x, grid.dx)
-    y_ind = div(y, grid.dy)
-    xr = (x - grid.dx*x_ind) / grid.dx
-    yr = (y - grid.dy*y_ind) / grid.dy
 
-    v = zeros(Float64, (1, mx*my))
-    for i=1:mx
-        for j=1:my
-            a = xr^(i-1) / factorial(i-1)
-            b = yr^(j-1) / factorial(j-1)
-            v[1,i + mx*(j-1)] = a*b
-        end
+
+function interpolation_matrix(points, grid::Grid)
+
+    dat = Float64[]
+    is = Int32[]
+    js = Int32[]
+
+    Np = size(points)[2]
+    for k=1:Np
+        x = points[1,k]
+        y = points[2,k]
+        row_dat, row_js = interpolation_row(x, y, grid)
+        row_is = k*ones(Int, grid.mx*grid.my)
+
+        dat = [dat; row_dat]
+        is = [is; row_is]
+        js = [js; row_js]
     end
 
-    dat = v * Minv
-
+    return sparse(is, js, dat, Np, grid.Nx*grid.Ny) * grid.inverse_projection
 end

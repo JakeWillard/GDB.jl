@@ -5,6 +5,8 @@ struct Grid
     points::Matrix{Float64}
     projection::SparseMatrixCSC
     inverse_projection::SparseMatrixCSC
+    mx::Int32
+    my::Int32
     Nx::Int32
     Ny::Int32
     Nk::Int32
@@ -90,5 +92,5 @@ function Grid(inside::Function, Nx::Int, Ny::Int, mx::Int, my::Int)
     MxyinvT = stencil2d(mx, my)
 
 
-    return Grid(points, P, Pinv, Nx, Ny, Nk, Mxinv, Myinv, MxyinvT, dx, dy)
+    return Grid(points, P, Pinv, mx, my, Nx, Ny, Nk, Mxinv, Myinv, MxyinvT, dx, dy)
 end
