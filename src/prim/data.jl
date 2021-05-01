@@ -16,16 +16,36 @@ mutable struct Variable{T<:Physical}
 end
 
 
+function Variable{T}(pval::Matrix{Float64}, cval::Matrix{Float64}) where {T<:Physical}
+
+    blank = zeros(Float64, size(pval))
+    return Variable{T}(pval, cval, blank, blank, blank, blank, blank, blank, blank)
+end
+
+
+
 function Variable{T}(v0::Vector{Float64}, Nz::Int) where {T<:Physical}
 
     Nk = length(v0)
-    val = zeros(Float64, (Nk, Nz))
+    pval = zeros(Float64, (Nk, Nz))
+    cval = zeros(Float64, (Nk, Nz))
+
     for i=1:Nz
-        val[:,i] = v0[:]
+        pval[:,i] = v0[:]
+        cval[:,i] = v0[:]
     end
 
-    blank = zeros(Float64, (Nk, Nz))
-    return Variable{T}(val, val, val, blank, blank, blank, blank, blank, blank)
+    return Variable{T}(pval, cval)
+end
+
+
+function Variable{T}(dset) where {T<:Physical}
+
+    if size(dset)[3] > 1
+        return Variable{T}(dset[:,:,end-1], dset[:,:,end])
+    elseif size(dset)[3] == 1
+        return Variable{T}(dset[:,:,1], dset[:,:,1])
+    end
 end
 
 
@@ -65,13 +85,4 @@ function to_3d_mesh(var::Variable, grid::Grid)
     end
 
     return out
-end
-
-
-
-function write_variable!(dset, t, var::Variable, grid::Grid)
-
-    var_mesh = to_3d_mesh(var, grid)
-    dset[:,:,:,t] = var_mesh[:,:,:]
-
 end
