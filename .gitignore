@@ -4,3 +4,4 @@
 /Manifest.toml
 /src/dev.jl
 /src/devtools.jl
+*.h5
