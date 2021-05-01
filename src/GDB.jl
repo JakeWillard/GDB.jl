@@ -13,7 +13,6 @@ include("./prim/jacobi.jl")
 include("./prim/data.jl")
 include("./prim/boundaries.jl")
 
-include("./models/adv_diff.jl")
 
 
 # have placeholder test_simulation for now
