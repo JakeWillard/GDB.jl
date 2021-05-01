@@ -19,45 +19,6 @@ struct Grid
 end
 
 
-function stencil(m::Int)
-
-    ic = Int(ceil(m/2.0))
-    M = zeros((m, m))
-    for i=1:m
-        for j=1:m
-            M[i, j] = (i - ic)^(j-1) / factorial(j-1)
-        end
-    end
-    return inv(M)
-end
-
-
-function stencil2d(mx::Int, my::Int)
-
-    ic = Int(ceil(mx/2.0))
-    jc = Int(ceil(my/2.0))
-
-
-    M = zeros((mx*my, mx*my))
-    for i=1:mx
-        for j=1:my
-            for ii=1:mx
-                for jj=1:my
-                    row = i + mx*(j-1)
-                    col = ii + mx*(jj-1)
-
-                    a = (i-ic)^(ii-1) / factorial(ii-1)
-                    b = (j-jc)^(jj-1) / factorial(jj-1)
-                    M[row, col] = a*b
-                end
-            end
-        end
-    end
-
-    return inv(M)
-end
-
-
 function Grid(inside::Function, Nx::Int, Ny::Int, mx::Int, my::Int)
 
     N = Nx * Ny
@@ -89,7 +50,7 @@ function Grid(inside::Function, Nx::Int, Ny::Int, mx::Int, my::Int)
     # compute stencils
     Mxinv = stencil1d(mx)
     Myinv = stencil1d(my)
-    MxyinvT = transpose(stencil2d(mx, my))
+    MxyinvT = stencil2d(mx, my)
 
 
     return Grid(points[:,1:Nk], P, Pinv, mx, my, Nx, Ny, Nk, Mxinv, Myinv, MxyinvT, dx, dy)

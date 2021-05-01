@@ -42,7 +42,7 @@ function stencil2d(mx, my)
     for i=1:mx
         for j=1:my
             k = i + (j-1)*mx
-            M[k,:] = spline2d(i-ic, j-jc, 1.0, 1.0, mx, my)
+            M[k,:] = spline2d(i-ic, j-jc, mx, my)
         end
     end
 
