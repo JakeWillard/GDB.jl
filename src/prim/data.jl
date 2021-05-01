@@ -21,7 +21,7 @@ function Variable{T}(v0::Vector{Float64}, Nz::Int) where {T<:Physical}
     Nk = length(v0)
     val = zeros(Float64, (Nk, Nz))
     for i=1:Nz
-        val[:,i,j] = v0[:]
+        val[:,i] = v0[:]
     end
 
     blank = zeros(Float64, (Nk, Nz))
@@ -68,10 +68,10 @@ function to_3d_mesh(var::Variable, grid::Grid)
 end
 
 
-# function write_variable(fid, var::Variable, grid::Grid)
-#
-#     var_mesh = to_3d_mesh(var, grid)
-#     fid["output"]
-#
-#
-# end
+
+function write_variable!(dset, t, var::Variable, grid::Grid)
+
+    var_mesh = to_3d_mesh(var, grid)
+    dset[:,:,:,t] = var_mesh[:,:,:]
+
+end
