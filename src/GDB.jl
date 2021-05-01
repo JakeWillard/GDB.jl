@@ -10,7 +10,7 @@ include("./prim/splines.jl")
 include("./prim/grids.jl")
 include("./prim/matrices.jl")
 include("./prim/jacobi.jl")
-include("./prim/physical.jl")
+include("./prim/data.jl")
 include("./prim/boundaries.jl")
 
 include("./models/adv_diff.jl")
