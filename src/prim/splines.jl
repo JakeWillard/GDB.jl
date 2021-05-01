@@ -19,9 +19,9 @@ function spline2d(xr, yr, mx, my)
 
     for i=1:mx
         for j=1:my
-            k = i + 1 + (j-1)*mx
-            a = xr**(i-1) / factorial(i-1)
-            b = yr**(j-1) / factorial(j-1)
+            k = i + (j-1)*mx
+            a = xr^(i-1) / factorial(i-1)
+            b = yr^(j-1) / factorial(j-1)
             out[k] = a * b
         end
     end
@@ -41,7 +41,7 @@ function stencil2d(mx, my)
 
     for i=1:mx
         for j=1:my
-            k = i + 1 + (j-1)*mx
+            k = i + (j-1)*mx
             M[k,:] = spline2d(i-ic, j-jc, 1.0, 1.0, mx, my)
         end
     end
@@ -67,13 +67,13 @@ function interpolation_row(x, y, MinvT, Nx, Ny, mx, my)
     row_dat = MinvT * spline
 
     # collective index for first nonzero element of output
-    k0 = (icg - ics) + 1 + (jcg - jcs - 1)*Nx
+    k0 = (icg - ics) + (jcg - jcs - 1)*Nx
 
     # indices for nonzero elements of row
     row_js = zeros(Int, mx*my)
     for i=1:mx
         for j=1:my
-            row_js[i+1+(j-1)*mx] = k0 + i + (j-1)*Nx
+            row_js[i+(j-1)*mx] = k0 + (i-1) + (j-1)*Nx
         end
     end
 

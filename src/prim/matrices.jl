@@ -63,7 +63,7 @@ end
 
 function interpolation_row(x, y, grid::Grid)
 
-    return interpolation_row(x, y, grid.MxyinvT, grid.Nx, grid.Ny, grid.mx, grid,my)
+    return interpolation_row(x, y, grid.MxyinvT, grid.Nx, grid.Ny, grid.mx, grid.my)
 end
 
 

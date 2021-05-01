@@ -71,10 +71,10 @@ function Grid(inside::Function, Nx::Int, Ny::Int, mx::Int, my::Int)
     proj_cols = zeros(Int32, N)
     proj_vals = ones(Int32, N)
 
-    for i=1:Nx
-        for j=1:Ny
-            x = i / Nx
-            y = j / Nx
+    for j=1:Ny
+        for i=1:Nx
+            x = (i-1) / Nx
+            y = (j-1) / Ny
             if inside(x, y)
                 Nk += 1
                 points[:,Nk] = [x, y]
@@ -89,8 +89,8 @@ function Grid(inside::Function, Nx::Int, Ny::Int, mx::Int, my::Int)
     # compute stencils
     Mxinv = stencil1d(mx)
     Myinv = stencil1d(my)
-    MxyinvT = stencil2d(mx, my)
+    MxyinvT = transpose(stencil2d(mx, my))
 
 
-    return Grid(points, P, Pinv, mx, my, Nx, Ny, Nk, Mxinv, Myinv, MxyinvT, dx, dy)
+    return Grid(points[:,1:Nk], P, Pinv, mx, my, Nx, Ny, Nk, Mxinv, Myinv, MxyinvT, dx, dy)
 end
