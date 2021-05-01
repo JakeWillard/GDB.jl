@@ -57,8 +57,8 @@ function interpolation_row(x, y, MinvT, Nx, Ny, mx, my)
     jcs = Int(ceil(my/2.0))
 
     # indices for center point in grid
-    icg = div(x, 1/Nx)
-    jcg = div(y, 1/Ny)
+    icg = Int(floor(x*Nx))
+    jcg = Int(floor(y*Ny))
 
     # values for row
     xr = x*Nx - icg
@@ -67,13 +67,13 @@ function interpolation_row(x, y, MinvT, Nx, Ny, mx, my)
     row_dat = MinvT * spline
 
     # collective index for first nonzero element of output
-    k0 = (icg - ics) + (jcg - jcs - 1)*Nx
+    k0 = (icg - ics + 1) + (jcg - jcs)*Nx
 
     # indices for nonzero elements of row
     row_js = zeros(Int, mx*my)
     for i=1:mx
         for j=1:my
-            row_js[i+(j-1)*mx] = k0 + (i-1) + (j-1)*Nx
+            row_js[i+(j-1)*mx] = k0 + (i-1) + (j)*Nx
         end
     end
 
