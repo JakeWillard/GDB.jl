@@ -88,3 +88,24 @@ function interpolation_matrix(points, grid::Grid)
 
     return sparse(is, js, dat, Np, grid.Nx*grid.Ny) * grid.inverse_projection
 end
+
+
+function read_matrix(group)
+
+    V = group["I"][:]
+    Is = group["I"][:]
+    J = group["J"][:]
+    n, m = group["size"][:]
+    return sparse(Is, J, V, n, m)
+end
+
+
+function save_matrix!(group, A::SparseMatrixCSC)
+
+    n, m = size(A)
+    Is, J, V = findnz(A)
+    group["I"] = Is
+    group["J"] = J
+    group["V"] = V
+    group["size"] = Int[n, m]
+end
