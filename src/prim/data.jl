@@ -24,6 +24,15 @@ end
 
 
 
+function Variable{T}(dset::Array{Float64, 3}) where {T<:Physical}
+
+    pval = dset[:,:,end-1]
+    cval = dset[:,:,end]
+    return Variable{T}(pval, cval)
+end
+
+
+
 function Variable{T}(v0::Vector{Float64}, Nz::Int) where {T<:Physical}
 
     Nk = length(v0)
@@ -39,50 +48,9 @@ function Variable{T}(v0::Vector{Float64}, Nz::Int) where {T<:Physical}
 end
 
 
-function Variable{T}(dset) where {T<:Physical}
-
-    if size(dset)[3] > 1
-        return Variable{T}(dset[:,:,end-1], dset[:,:,end])
-    elseif size(dset)[3] == 1
-        return Variable{T}(dset[:,:,1], dset[:,:,1])
-    end
-end
-
 
 function Variable{T}(f::Function, Nz::Int, grid::Grid) where {T<:Physical}
 
-    Nk = grid.Nk
-    v0 = zeros(Float64, Nk)
-
-    for k=1:Nk
-        x = grid.points[1,k]
-        y = grid.points[2,k]
-        v0[k] = f(x, y)
-    end
-
+    v0 = f_to_grid(f, grid)
     return Variable{T}(v0, Nz)
-end
-
-
-function timeshift!(var::Variable)
-
-    var.pval[:,:] = var.cval[:,:]
-    var.cval[:,:] = var.fval[:,:]
-end
-
-
-function to_3d_mesh(var::Variable, grid::Grid)
-
-    vals = grid.inverse_projection * var.cval[:,:]
-
-    Nx = grid.Nx
-    Ny = grid.Ny
-    Nz = size(vals)[2]
-    out = zeros(Float64, (grid.Nx, grid.Ny, Nz))
-
-    for j=1:Ny
-        out[:,j,:] = vals[1+(j-1)*Nx:j*Nx,:]
-    end
-
-    return out
 end

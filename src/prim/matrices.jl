@@ -90,7 +90,7 @@ function interpolation_matrix(points, grid::Grid)
 end
 
 
-function read_matrix(group)
+function load_matrix(group)
 
     V = group["I"][:]
     Is = group["I"][:]
@@ -99,8 +99,7 @@ function read_matrix(group)
     return sparse(Is, J, V, n, m)
 end
 
-
-function save_matrix!(group, A::SparseMatrixCSC)
+function save_matrix(group, A::SparseMatrixCSC)
 
     n, m = size(A)
     Is, J, V = findnz(A)
