@@ -6,7 +6,7 @@ function x_derivative(n, grid::Grid)
 
     Dx = sparse(zeros(Float64, (Nx, Nx)))
     Iy = sparse(I, Ny, Ny)
-    stencil = grid.x_stencil[n+1,:]
+    stencil = grid.Mxinv[n+1,:]
     m = length(stencil)
     ic = Int(ceil(m/2.0))
 
@@ -31,7 +31,7 @@ function y_derivative(n, grid::Grid)
 
     Dy = sparse(zeros(Float64, (Ny, Ny)))
     Ix = sparse(I, Nx, Nx)
-    stencil = grid.y_stencil[n+1,:]
+    stencil = grid.Myinv[n+1,:]
     m = length(stencil)
     ic = Int(ceil(m/2.0))
 
@@ -87,24 +87,4 @@ function interpolation_matrix(points, grid::Grid)
     end
 
     return sparse(is, js, dat, Np, grid.Nx*grid.Ny) * grid.inverse_projection
-end
-
-
-function load_matrix(group)
-
-    V = group["I"][:]
-    Is = group["I"][:]
-    J = group["J"][:]
-    n, m = group["size"][:]
-    return sparse(Is, J, V, n, m)
-end
-
-function save_matrix(group, A::SparseMatrixCSC)
-
-    n, m = size(A)
-    Is, J, V = findnz(A)
-    group["I"] = Is
-    group["J"] = J
-    group["V"] = V
-    group["size"] = Int[n, m]
 end

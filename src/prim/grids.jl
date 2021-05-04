@@ -87,6 +87,24 @@ function f_to_grid(f::Function, grid::Grid)
     return vec
 end
 
+function load_matrix(group)
+
+    V = group["V"][:]
+    Is = group["I"][:]
+    J = group["J"][:]
+    n, m = group["size"][:]
+    return sparse(Is, J, V, n, m)
+end
+
+function save_matrix(group, A::SparseMatrixCSC)
+
+    n, m = size(A)
+    Is, J, V = findnz(A)
+    group["I"] = Int32[Is...]
+    group["J"] = Int32[J...]
+    group["V"] = Float64[V...]
+    group["size"] = Int[n, m]
+end
 
 function save_grid(fid, grd::Grid)
 
