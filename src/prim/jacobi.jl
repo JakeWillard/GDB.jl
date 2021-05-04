@@ -30,7 +30,6 @@ function p_jacobi(A::SparseMatrixCSC, x::Vector{Float64}, b::Vector{Float64}, w:
         end
         err = norm(xnext - x) / bnorm
         x[:] = xnext[:]
-        err = 0.0
     end
     return x
 
