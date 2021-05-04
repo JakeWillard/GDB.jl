@@ -89,7 +89,7 @@ function outer_penalization(b, dr, grd::Grid)
         x = grd.points[1,k]
         y = grd.points[2,k]
         r = sqrt((x-0.5)^2 + (y-0.5)^2)
-        l = (b - dr - r)/(2*dr)
+        l = (r - b - dr)/(2*dr)
         if l < 0
             penvec[k] = 0
         elseif 0 < l < 1
@@ -106,6 +106,8 @@ end
 function partial_t!(w::Variable{Vorticity}, phi::Variable{Potential}, R1, R2, P1, P2)
 
     w.t = phi.x[:,:] .* w.y[:,:] - phi.y[:,:] .* w.x[:,:]
+    # w.t = (I - P1) * w.t + P1 * w.cval
+    # w.t = (I - P2) * w.t + P2 * w.cval
     w.t = (I - P1) * w.t - P1 * (I + R1) * (10*w.cval)
     w.t = (I - P2) * w.t - P2 * (I + R2) * (10*w.cval)
 end
@@ -186,7 +188,7 @@ function timestep!(lnn, w, phi, grd, phi0, dt, D, Dx, Dy, L, R1, R2, P1, P2)
     w.fval = 0.5*(w.pval[:,:] + w.cval[:,:]) + dt*w.t[:,:]
 
     # apply_diffusion!(lnn, D, L, R1, R2, P1, P2)
-    # apply_diffusion!(w, D, L, R1, R2, P1, P2)
+    apply_diffusion!(w, D, L, R1, R2, P1, P2)
     # solve_vorticity_eqn!(phi, lnn, w, phi0, L, P1, P2)
     lnn.pval = lnn.cval[:,:]
     lnn.cval = lnn.fval[:,:]
@@ -206,7 +208,7 @@ function timestep!(lnn, w, phi, grd, phi0, dt, D, Dx, Dy, L, R1, R2, P1, P2)
     w.fval = w.pval[:,:] + dt*w.t[:,:]
 
     # apply_diffusion!(lnn, D, L, R1, R2, P1, P2)
-    # apply_diffusion!(w, D, L, R1, R2, P1, P2)
+    apply_diffusion!(w, D, L, R1, R2, P1, P2)
     # solve_vorticity_eqn!(phi, lnn, w, phi0, L, P1, P2)
     lnn.pval = lnn.cval[:,:]
     lnn.cval = lnn.fval[:,:]
@@ -228,7 +230,7 @@ end
 function simulation(path, N, Nt)
 
     dt = 0.001
-    D = 0.2
+    D = 0.001
 
     grd = Annalus(N, 0.1, 0.45)
 
@@ -237,10 +239,9 @@ function simulation(path, N, Nt)
     L = laplacian(grd)
 
     R1 = inner_reflection(0.12, 0.01, grd)
-    R2 = outer_reflection(0.43, 0.01, grd)
+    R2 = outer_reflection(0.42, 0.01, grd)
     P1 = inner_penalization(0.12, 0.01, grd)
-    P2 = outer_penalization(0.43, 0.01, grd)
-    # return R1, R2, P1, P2, L
+    P2 = outer_penalization(0.42, 0.01, grd)
 
     phi0 = zeros(Float64, (grd.Nk, 2))
     phi0[:,1] = f_to_grid((x,y) -> y^2, grd)
@@ -265,6 +266,7 @@ function simulation(path, N, Nt)
 
     for t=2:Nt
         batch_integrate(t, path, lnn, w, phi, grd, phi0, dt, D, Dx, Dy, L, R1, R2, P1, P2, nt=2)
+        println(t)
     end
 end
 
