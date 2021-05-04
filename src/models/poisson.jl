@@ -64,15 +64,17 @@ function solve_with_dirichlet(x0, f, N, a, b, dr)
     fvec = f_to_grid(f, grd)
     x0vec = f_to_grid(x0, grd)
 
-    A = ((I - P) * L / grd.dx^2 + P * (R + I))
+    A = L / grd.dx^2
+    # A = ((I - P) * L / grd.dx^2 + P * (R + I))
     b = (I - P) * fvec
 
     # xa = A \ b
+    # x = A \ fvec
 
-    xb = p_jacobi(A, x0vec, b, 0.1, 100, 1, 2, 1e-2)
-    println(norm(xa - xb))
+    # xb = p_jacobi(A, x0vec, b, 1.0, 10000, 1, 2, 1e-8)
+    # println(norm(xa - xb))
 
-    #x = p_jacobi(L, x0vec, fvec, 0.2, 100, 1, 2, 1e-20)
+    x = p_jacobi(A, x0vec, fvec, 1.0, 100, 1, 2, 1e-8)
 
-    return vec_to_mesh(xb, grd)
+    return vec_to_mesh(x, grd)
 end
