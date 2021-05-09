@@ -1,6 +1,5 @@
 
 
-
 function Circle(N, a)
 
     r(x, y) = sqrt((x - 0.5)^2 + (y - 0.5)^2)
@@ -54,38 +53,51 @@ function outer_penalization(b, dr, grd::Grid)
 end
 
 
-function solve_with_dirichlet(x0, f, N, a, b, dr)
 
+function vorticity(w, phib, N)
 
-    grd = Circle(N, a)
-    R = outer_reflection(b, dr, grd)
-    P = outer_penalization(b, dr, grd)
-    L = laplacian(grd)
-    fvec = f_to_grid(f, grd)
-    x0vec = f_to_grid(x0, grd)
+    grd = Circle(N, 0.45)
 
-    Dx = x_derivative(1, grd)
-    Dy = y_derivative(1, grd)
-    rx(x,y) = (x - 0.5) / sqrt((x-0.5)^2 + (y-0.5)^2)
-    ry(x,y) = (y - 0.5) / sqrt((x-0.5)^2 + (y-0.5)^2)
-    xhat = Diagonal(f_to_grid(rx, grd))
-    yhat = Diagonal(f_to_grid(ry, grd))
-    Dr = xhat * Dx + yhat * Dy
+    pb = f_to_grid(phib, grd)
+    f = f_to_grid(w, grd)
 
-    # A = L / grd.dx^2
-    # A = ((I - P) * L / grd.dx^2 + (R + I)*P)
-    A = ((I - P) * L / grd.dx^2 + P*(R - I))
-    b = (I - P) * fvec
+    R = outer_reflection(0.4, 0.01, grd)
+    P = outer_penalization(0.4, 0.01, grd)
+    L = laplacian(grd) / grd.dx^2
 
-    A2 = transpose(A) * A
+    A = (I - P) * L + P * (R + I)
+    b = (I - P) * f + P * (R + I) * pb
+
+    b = transpose(A) * b
+    A = transpose(A) * A
+
+    x = A \ b
+    return vec_to_mesh(x, grd)
+end
+
+function n_diff(lnn, D, N)
+
+    grd = Circle(N, 0.45)
+    f = f_to_grid(lnn, grd)
+
+    R = outer_reflection(0.3, 0.03, grd)
+    P = outer_penalization(0.3, 0.03, grd)
+    L = laplacian(grd) / grd.dx^2
+
+    M = (I - P) + P*(R - I)
+    c = (I - P) * f
+    c = transpose(M) * c
+    M = transpose(M) * M
+
+    f = M \ c
+    return vec_to_mesh(f, grd)
+
+    A = (I - P) * (I - D*L) + P * (R - I)
+    b = (I - P) * f + 2*log(0.2)*diag(P)
+
     b2 = transpose(A) * b
+    A2 = transpose(A) * A
 
     x = A2 \ b2
-
-    # xb = p_jacobi(A, x0vec, b, 1.0, 10000, 1, 2, 1e-8)
-    # println(norm(xa - xb))
-
-    # x = p_jacobi(A, x0vec, b, 1.0, 100, 1, 2, 1e-2)
-
     return vec_to_mesh(x, grd)
 end
