@@ -114,8 +114,8 @@ end
 function partial_t!(lnn::Variable{LogDensity}, phi::Variable{Potential}, R1, R2, P1, P2)
 
     lnn.t = phi.x[:,:] .* lnn.y[:,:] - phi.y[:,:] .* lnn.x[:,:]
-    lnn.t = (I - P1) * lnn.t - P1 * (I - R1) * (10*lnn.cval)
-    lnn.t = (I - P2) * lnn.t - P2 * (I - R2) * (10*lnn.cval)
+    lnn.t = (I - P1) * lnn.t - P1 * (I + R1) * (10*lnn.cval)
+    lnn.t = (I - P2) * lnn.t - P2 * (I + R2) * (10*lnn.cval)
 end
 
 
@@ -124,10 +124,9 @@ function apply_diffusion!(w::Variable{Vorticity}, D, L, R1, R2, P1, P2)
     A = I - D*L
     A = (I - P1)*A + P1*(R1 + I)
     A = (I - P2)*A + P2*(R2 + I)
-    # A += P1*(R1 + I) - P1*A
-    # A += P2*(R2 + I) - P2*A
+
     x0 = w.fval[:,1]
-    b = (I - P1) * x0
+    b = (I - P1) * x0 # + diag(P1)
     b = (I - P2) * b[:]
 
     w.fval[:,1] = A \ b
@@ -137,28 +136,27 @@ end
 function apply_diffusion!(lnn::Variable{LogDensity}, D, L, R1, R2, P1, P2)
 
     A = I - D*L
-    A = (I - P1)*A + P1 * (R1 - I)
-    A = (I - P2)*A + P2 * (R1 - I)
+    A = (I - P1)*A + P1*(R1 - I)
+    A = (I - P2)*A + P2*(R2 - I)
 
     x0 = lnn.fval[:,1]
-    b = (I - P1)*x0
-    b = (I - P2)*b[:]
+    b = (I - P1) * x0 + diag(P1)
+    b = (I - P2) * b[:]
 
     b = transpose(A) * b
     A = transpose(A) * A
-
-    lnn.fval[:,1] = A \ b
+    lnn.cval[:,1] = A \ b
 end
 
 
 function solve_vorticity_eqn!(phi::Variable{Potential}, lnn::Variable{LogDensity}, w::Variable{Vorticity}, phi0::Matrix{Float64}, L, R1, R2, P1, P2, dx)
 
-    A = (I - P1) * L / dx^2 + P1 * (R1 + I)
-    A = (I - P2) * A + P2 * (R2 + I)
+    A = (I - P1) * L / dx^2 + P1 * (R1 - I)
+    A = (I - P2) * A + P2 * (R2 - I)
 
     # b = w.fval[:,1] # .* exp.(-lnn.fval[:,1])
-    b = (I - P1) * w.fval[:,1]
-    b = (I - P2) * b[:] # + diag(P2)
+    b = (I - P1) * w.fval[:,1] # + P1 * phi0[:,1]
+    b = (I - P2) * b[:]
 
     b = transpose(A) * b
     A = transpose(A) * A
@@ -189,7 +187,7 @@ function timestep!(lnn, w, phi, grd, phi0, dt, D, Dx, Dy, L, R1, R2, P1, P2)
     partial_t!(lnn, phi, R1, R2, P1, P2)
     partial_t!(w, phi, R1, R2, P1, P2)
 
-    lnn.fval = 0.5*(lnn.pval[:,:] + lnn.cval[:,:]) + dt*lnn.t[:,:]
+    # lnn.fval = 0.5*(lnn.pval[:,:] + lnn.cval[:,:]) + dt*lnn.t[:,:]
     w.fval = 0.5*(w.pval[:,:] + w.cval[:,:]) + dt*w.t[:,:]
 
     apply_diffusion!(lnn, D, L, R1, R2, P1, P2)
@@ -209,7 +207,7 @@ function timestep!(lnn, w, phi, grd, phi0, dt, D, Dx, Dy, L, R1, R2, P1, P2)
     partial_t!(lnn, phi, R1, R2, P1, P2)
     partial_t!(w, phi, R1, R2, P1, P2)
 
-    lnn.fval = lnn.pval[:,:] + dt*lnn.t[:,:]
+    # lnn.fval = lnn.pval[:,:] + dt*lnn.t[:,:]
     w.fval = w.pval[:,:] + dt*w.t[:,:]
 
     apply_diffusion!(lnn, D, L, R1, R2, P1, P2)
@@ -247,13 +245,18 @@ function simulation(path, N, Nt, D, dt)
     P2 = outer_penalization(0.42, 0.01, grd)
 
     phi0 = zeros(Float64, (grd.Nk, 2))
-    phi0[:,1] = f_to_grid((x,y) -> y^2, grd)
+    phi0[:,1] = f_to_grid((x,y) -> 10*(y-0.5)^2*(0.12^2) / ((x-0.5)^2 + (y-0.5)^2), grd)
+    phi0[:,2] = f_to_grid((x,y) -> atan(y-0.5, x-0.5), grd)
 
-    lnn = Variable{LogDensity}((x,y) -> 1.0, 1, grd)
-    w = Variable{Vorticity}((x,y) -> sin(3*pi*x)*sin(3*pi*y), 1, grd)
+    r(x,y) = sqrt((x-0.5)^2 + (y-0.5)^2)
+    w = Variable{Vorticity}((x,y) -> 100*sech((0.3-r(x,y))/0.05)^2*sin((0.3-r(x,y))/0.05), 1, grd)
+
+    lnn = Variable{LogDensity}((x,y) -> exp(0.12-sqrt((x-0.5)^2 + (y-0.5)^2)), 1, grd)
+    #w = Variable{Vorticity}((x,y) -> sin(6*pi*x)*sin(6*pi*y), 1, grd)
     phi = Variable{Potential}((x,y) -> 3*sqrt((x-0.5)^2 + (y-0.5)^2), 1, grd)
 
     w.fval[:,:] = w.cval[:,:]
+    lnn.fval[:,:] = lnn.cval[:,:]
     solve_vorticity_eqn!(phi, lnn, w, phi0, L, R1, R2, P1, P2, grd.dx)
 
     fid = h5open(path, "w")
@@ -271,7 +274,7 @@ function simulation(path, N, Nt, D, dt)
     close(fid)
 
     for t=2:Nt
-        batch_integrate(t, path, lnn, w, phi, grd, phi0, dt, D, Dx, Dy, L, R1, R2, P1, P2, nt=2)
+        batch_integrate(t, path, lnn, w, phi, grd, phi0, dt, D, Dx, Dy, L, R1, R2, P1, P2, nt=6)
         println(t)
     end
 end

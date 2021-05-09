@@ -89,5 +89,5 @@ function n_diff(lnn, D, N)
     A2 = transpose(A) * A
 
     x = A \ b
-    return x, A, b, vec_to_mesh(x, grd)
+    return vec_to_mesh(x, grd)
 end
