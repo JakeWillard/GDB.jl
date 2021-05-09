@@ -52,8 +52,6 @@ function outer_penalization(b, dr, grd::Grid)
     return Diagonal(penvec)
 end
 
-
-
 function vorticity(w, phib, N)
 
     grd = Circle(N, 0.45)
@@ -80,24 +78,16 @@ function n_diff(lnn, D, N)
     grd = Circle(N, 0.45)
     f = f_to_grid(lnn, grd)
 
-    R = outer_reflection(0.3, 0.03, grd)
-    P = outer_penalization(0.3, 0.03, grd)
+    R = outer_reflection(0.4, 0.01, grd)
+    P = outer_penalization(0.4, 0.01, grd)
     L = laplacian(grd) / grd.dx^2
 
-    M = (I - P) + P*(R - I)
-    c = (I - P) * f
-    c = transpose(M) * c
-    M = transpose(M) * M
-
-    f = M \ c
-    return vec_to_mesh(f, grd)
-
     A = (I - P) * (I - D*L) + P * (R - I)
-    b = (I - P) * f + 2*log(0.2)*diag(P)
+    b = (I - P) * f
 
     b2 = transpose(A) * b
     A2 = transpose(A) * A
 
-    x = A2 \ b2
-    return vec_to_mesh(x, grd)
+    x = A \ b
+    return x, A, b, vec_to_mesh(x, grd)
 end

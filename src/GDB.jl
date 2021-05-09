@@ -11,7 +11,6 @@ include("./prim/grids.jl")
 include("./prim/matrices.jl")
 include("./prim/jacobi.jl")
 include("./prim/data.jl")
-include("./prim/boundaries.jl")
 
 
 
