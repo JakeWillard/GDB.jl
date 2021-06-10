@@ -10,7 +10,6 @@ include("./prim/splines.jl")
 include("./prim/grids.jl")
 include("./prim/matrices.jl")
 include("./prim/jacobi.jl")
-include("./prim/data.jl")
 
 
 

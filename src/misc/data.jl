@@ -1,4 +1,7 @@
 
+#NOTE: this code is used in the example programs found in the /models folder, but I don't think its a good way
+#      to structure the programs anymore, it seems to overcomplicate things. 
+
 abstract type Physical end
 
 mutable struct Variable{T<:Physical}

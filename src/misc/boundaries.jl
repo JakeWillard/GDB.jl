@@ -1,5 +1,6 @@
 
-
+# NOTE: perhaps designing a high level API for implementing boundary penalization calculations would be
+#       nice, but probably it would just be overcomplication. 
 
 
 struct Boundary
