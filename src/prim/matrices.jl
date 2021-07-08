@@ -88,3 +88,23 @@ function interpolation_matrix(points, grid::Grid)
 
     return sparse(is, js, dat, Np, grid.Nx*grid.Ny) * grid.inverse_projection
 end
+
+
+
+function reflection_matrix(wall:Wall, grd::Grid)
+
+    points = zeros(Float64, grd.Nk)
+    n = 0
+
+    for k=1:Nk
+        x, y = grd.points[:,k]
+        if 0 < wall.sstep(x,y) < 1
+            n += 1
+            points[:,n] = wall.reflect(x, y)
+        else
+            points[:,n] = grd.points[:,k]
+        end
+    end
+
+    return interpolation_matrix(points, grd)
+end
