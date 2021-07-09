@@ -46,7 +46,9 @@ function SimulationSetup(Lx, Ly, h, ds, N, m)
     psi_a = psi(Lx/2.0 - h - 5*ds, 0)
     psi_b = psi(0, Ly/2.0 - h - 5*ds)
     dp_a = psi(Lx/2.0 - h - 4*ds, 0) - psi_a
-    dp_b = psi(0, Ly/2.0 - 4*ds) - psi_b
+    dp_b = psi(0, Ly/2.0 - h - 4*ds) - psi_b
+    println(psi_a)
+    println(psi_b)
 
     outer_wall = Rectangle(Lx+5*ds, Ly+5*ds, ds)
     pos_flx = FluxWall(psi, psi_a, bx, by, ds, dp_a)
