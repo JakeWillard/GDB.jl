@@ -36,27 +36,39 @@ struct SimulationSetup
 end
 
 
-function SimulationSetup(Lx, Ly, h, ds, N, m)
+function SimulationSetup(Lx, Ly, h, ds, N, n, m)
 
     psi(x,y) = Psi(x, y, Lx, Ly)
     bx(x,y) = b(x,y,Lx,Ly)[1]
     by(x,y) = b(x,y,Lx,Ly)[2]
 
+    # define dimensions for coarse grid
+    Lxc, Lyc = [Lx, Ly] .+ 5*ds
+    psi_ac = psi(Lxc/2 - h, 0)
+    psi_bc = psi(0, Lyc/2 - h)
+    dp_ac = psi(Lxc/2 - h + ds, 0) - psi_ac
+    dp_bc = psi(0, Lyc/2 - h + ds) - psi_bc
+
+    # make walls for coarse grid
+    outer_wall_c = Rectangle(Lxc, Lyc, ds)
+    x_flx_c = FluxWall(psi, psi_ac, bx, by, ds, dp_ac)
+    y_flx_c = FluxWall(psi, psi_bc, bx, by, ds, dp_bc)
+
     # make coarse grid
-    psi_a = psi(Lx/2.0 - h - 5*ds, 0)
-    psi_b = psi(0, Ly/2.0 - h - 5*ds)
-    dp_a = psi(Lx/2.0 - h - 4*ds, 0) - psi_a
-    dp_b = psi(0, Ly/2.0 - h - 4*ds) - psi_b
-    println(psi_a)
-    println(psi_b)
+    corners = Float64[-Lxc/2-h Lxc/2+h; -Lyc/2-h Lyc/2+h]
+    crs_grd = Grid([outer_wall_c, x_flx_c, y_flx_c], corners, N, m)
 
-    outer_wall = Rectangle(Lx+5*ds, Ly+5*ds, ds)
-    pos_flx = FluxWall(psi, psi_a, bx, by, ds, dp_a)
-    neg_flx = FluxWall(psi, psi_b, bx, by, ds, dp_b)
+    # define dimensions for fine grid
+    psi_af = psi(Lx/2 - h, 0)
+    psi_bf = psi(0, Ly/2 - h)
+    dp_af = psi(Lx/2 - h + ds, 0) - psi_af
+    dp_bf = psi(0, Ly/2 - h + ds) - psi_bf
 
-    corners = Float64[-Lx/2-h Lx/2+h; -Ly/2-h Ly/2+h]
+    # make fine grid
+    outer_wall_f = Rectangle(Lx, Ly, ds)
+    x_flx_f = FluxWall(psi, psi_af, bx, by, ds, dp_af)
+    y_flx_f = FluxWall(psi, psi_bf, bx, by, ds, dp_bf)
+    fine_grd = Grid(crs_grd, [outer_wall_f, x_flx_f, y_flx_f], corners, n, m)
 
-    crs_grd = Grid([outer_wall, pos_flx, neg_flx], corners, N, m)
-
-    return SimulationSetup(crs_grd)
+    return SimulationSetup(fine_grd)
 end
