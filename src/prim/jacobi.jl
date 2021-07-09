@@ -15,7 +15,7 @@ end
 function p_jacobi(A::SparseMatrixCSC, x::Vector{Float64}, b::Vector{Float64}, w::Float64, N::Int, n::Int, chunks::Int, threshold::Float64)
 
     Dinv = inv(Diagonal(A))
-    
+
     M = I - w*Dinv*A
     f = w*Dinv * b
 
