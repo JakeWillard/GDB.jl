@@ -19,7 +19,7 @@ struct Grid
 end
 
 
-function Grid(walls::Array{Wall, 1}, corners::Matrix{Float64}, N::Vector{Int}, m::Vector{Int})
+function Grid(walls::Vector{Wall}, deltas::Vector{Float64}, corners::Matrix{Float64}, N::Vector{Int}, m::Vector{Int})
 
     Nx, Ny = N
     Nxy = Nx*Ny
@@ -42,8 +42,8 @@ function Grid(walls::Array{Wall, 1}, corners::Matrix{Float64}, N::Vector{Int}, m
             y = c1[2] + (j-1) * dy
             inside = true
 
-            for w in walls
-                if w.sstep(x, y) == 1
+            for l=1:length(walls)
+                if smoothstep(x, y, deltas[l], walls[l]) == 1
                     inside = false
                     break
                 end
@@ -71,7 +71,7 @@ function Grid(walls::Array{Wall, 1}, corners::Matrix{Float64}, N::Vector{Int}, m
 end
 
 
-function Grid(grd::Grid, walls::Array{Wall, 1}, corners::Matrix{Float64}, n::Vector{Int}, m::Vector{Int})
+function Grid(grd::Grid, walls::Vector{Wall}, deltas::Vector{Float64}, corners::Matrix{Float64}, n::Vector{Int}, m::Vector{Int})
 
     nx, ny = n
     Nxy = nx*ny*grd.Nk
@@ -96,8 +96,8 @@ function Grid(grd::Grid, walls::Array{Wall, 1}, corners::Matrix{Float64}, n::Vec
                 jj = Int(floor((y - c1[2]) / dy))
                 inside = true
 
-                for w in walls
-                    if w.sstep(x, y) == 1
+                for l=1:length(walls)
+                    if smoothstep(x, y, deltas[l], walls[l]) == 1
                         inside = false
                         break
                     end
@@ -126,146 +126,16 @@ function Grid(grd::Grid, walls::Array{Wall, 1}, corners::Matrix{Float64}, n::Vec
 end
 
 
-function Grid(walls::Array{Wall, 1}, corners::Matrix{Float64}, N::Int, m::Int)
+function Grid(walls::Array{Wall, 1}, deltas::Vector{Float64}, corners::Matrix{Float64}, N::Int, m::Int)
 
-    return Grid(walls, corners, Int[N, N], Int[m, m])
+    return Grid(walls, deltas, corners, Int[N, N], Int[m, m])
 end
 
 
-function Grid(grd::Grid, walls::Array{Wall, 1}, corners::Matrix{Float64}, n::Int, m::Int)
+function Grid(grd::Grid, walls::Array{Wall, 1}, deltas::Vector{Float64}, corners::Matrix{Float64}, n::Int, m::Int)
 
-    return Grid(grd, walls, corners, Int[n, n], Int[m, m])
+    return Grid(grd, walls, deltas, corners, Int[n, n], Int[m, m])
 end
-
-
-# function Grid(inside::Function, Nx::Int, Ny::Int, mx::Int, my::Int)
-#
-#     N = Nx * Ny
-#     Nk = 0
-#     points = zeros(Float64, (2, N))
-#     dx = 1 / Nx
-#     dy = 1 / Ny
-#
-#     # compute projection matrices
-#     proj_rows = Int32[i for i=1:N]
-#     proj_cols = zeros(Int32, N)
-#     proj_vals = ones(Int32, N)
-#
-#     for j=1:Ny
-#         for i=1:Nx
-#             x = (i-1) / Nx
-#             y = (j-1) / Ny
-#             if inside(x, y)
-#                 Nk += 1
-#                 points[:,Nk] = [x, y]
-#                 proj_cols[Nk] = i + Nx*(j-1)
-#             end
-#         end
-#     end
-#
-#     P = sparse(proj_rows[1:Nk], proj_cols[1:Nk], proj_vals[1:Nk], Nk, N)
-#     Pinv = transpose(P)
-#
-#     # compute stencils
-#     Mxinv = stencil1d(mx)
-#     Myinv = stencil1d(my)
-#     MxyinvT = stencil2d(mx, my)
-#
-#     return Grid(points[:,1:Nk], P, Pinv, mx, my, Nx, Ny, Nk, Mxinv, Myinv, MxyinvT, dx, dy)
-# end
-
-#
-# function Grid(inside::Function, N::Int, m::Int)
-#
-#     return Grid(inside, N, N, m, m)
-# end
-#
-#
-# function Grid(walls::Array{Wall, 1}, Nx::Int, Ny::Int, mx::Int, my::Int)
-#
-#     function inside(x, y)
-#
-#         flag = false
-#         for wall in walls
-#             if wall.sstep(x, y) <= 0.5
-#                 flag = true
-#             end
-#         end
-#
-#         return flag
-#     end
-#
-#     return Grid(inside, Nx, Ny, mx, my)
-# end
-#
-#
-# function Grid(walls::Array{Wall, 1}, N, m)
-#
-#     return Grid(walls, N, N, m, m)
-# end
-#
-#
-# function Grid(grd::Grid, inside::Function, nx::Int, ny::Int, mx::Int, my::Int)
-#
-#     points = zeros(Float64, (2, nx*ny*grd.Nk))
-#     dx = grd.dx / nx
-#     dy = grd.dy / ny
-#
-#     Nk = 0
-#     N = grd.Nx*grd.Ny*nx*ny
-#
-#     proj_rows = Int32[i for i=1:N]
-#     proj_cols = zeros(Int32, N)
-#     proj_vals = ones(Int32, N)
-#
-#     for i=1:grd.Nk
-#         for j=1:nx-1
-#             for k=1:ny-1
-#
-#                 x = grd.points[1,i] + j*dx
-#                 y = grd.points[2,i] + k*dy
-#                 ii = Int(floor(x/dx))
-#                 jj = Int(floor(y/dy))
-#                 if inside(x, y)
-#                     Nk += 1
-#                     points[:,Nk] = [x, y]
-#                     proj_cols[Nk] = ii + Nx*(nx-1)*(jj-1)
-#                 end
-#             end
-#         end
-#     end
-#
-#     P = sparse(proj_rows[1:Nk], proj_cols[1:Nk], proj_vals[1:Nk], Nk, N)
-#     Pinv = transpose(P)
-#
-#     # compute stencils
-#     Mxinv = stencil1d(mx)
-#     Myinv = stencil1d(my)
-#     MxyinvT = stencil2d(mx, my)
-#
-#     return Grid(points[:,1:Nk], P, Pinv, mx, my, Nx, Ny, Nk, Mxinv, Myinv, MxyinvT, dx, dy)
-# end
-#
-#
-# function Grid(grd::Grid, walls::Array{Wall, 1}, nx::Int, ny::Int, mx::Int, my::Int)
-#
-#
-#
-#
-#
-# end
-#
-#
-# function Grid(grd::Grid, inside::Function, n, m)
-#
-#     return Grid(grd, inside, n, n, m, m)
-# end
-#
-#
-# function Grid(grd::Grid, walls::Array{Wall, 1}, n, m)
-#
-#     return Grid(grd, walls, n, n, m, m)
-# end
 
 
 

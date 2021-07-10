@@ -93,18 +93,22 @@ end
 
 function reflection_matrix(wall:Wall, grd::Grid)
 
-    points = zeros(Float64, grd.Nk)
-    n = 0
+    points = zeros(Float64, (2, grd.Nk))
 
     for k=1:Nk
         x, y = grd.points[:,k]
         if 0 < wall.sstep(x,y) < 1
-            n += 1
-            points[:,n] = wall.reflect(x, y)
+            points[:,k] = wall.reflect(x, y)
         else
-            points[:,n] = grd.points[:,k]
+            points[:,k] = grd.points[:,k]
         end
     end
 
     return interpolation_matrix(points, grd)
+end
+
+
+function penalization_matrix(delta, wall::Wall, grd::Grid)
+
+    return Diagonal(f_to_grid((x,y) -> wall_step_function(x,y,delta,wall), grd))
 end
