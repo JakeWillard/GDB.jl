@@ -77,7 +77,7 @@ function PolyWall(vert, ds)
     function sstep(x, y)
 
         h, ns = poly_dist(x, y, vert)
-        u = h / ds
+        u = h / ds + 0.5
         return smoothstep(u)
     end
 
@@ -97,7 +97,7 @@ function FluxWall(psi, psi0, bx, by, ds, dp)
 
     function sstep(x, y)
 
-        u = (psi(x, y) - psi0) / dp
+        u = (psi(x, y) - psi0) / dp + 0.5
         return smoothstep(u)
     end
 
