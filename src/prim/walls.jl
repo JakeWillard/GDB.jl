@@ -54,6 +54,7 @@ end
 
 struct Wall
 
+    # surface defined as points where func(x,y) = val
     func::Function
     val::Float64
     reflect::Function

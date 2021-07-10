@@ -43,7 +43,7 @@ function Grid(walls::Vector{Wall}, deltas::Vector{Float64}, corners::Matrix{Floa
             inside = true
 
             for l=1:length(walls)
-                if smoothstep(x, y, deltas[l], walls[l]) == 1
+                if smoothstep(x, y, deltas[l], walls[l]) == 0
                     inside = false
                     break
                 end
@@ -97,7 +97,7 @@ function Grid(grd::Grid, walls::Vector{Wall}, deltas::Vector{Float64}, corners::
                 inside = true
 
                 for l=1:length(walls)
-                    if smoothstep(x, y, deltas[l], walls[l]) == 1
+                    if smoothstep(x, y, deltas[l], walls[l]) == 0
                         inside = false
                         break
                     end

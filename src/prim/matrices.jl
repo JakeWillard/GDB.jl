@@ -91,13 +91,13 @@ end
 
 
 
-function reflection_matrix(wall:Wall, grd::Grid)
+function reflection_matrix(delta, wall:Wall, grd::Grid)
 
     points = zeros(Float64, (2, grd.Nk))
 
     for k=1:Nk
         x, y = grd.points[:,k]
-        if 0 < wall.sstep(x,y) < 1
+        if 0 < smoothstep(x, y, delta, wall) < 1
             points[:,k] = wall.reflect(x, y)
         else
             points[:,k] = grd.points[:,k]
@@ -110,5 +110,5 @@ end
 
 function penalization_matrix(delta, wall::Wall, grd::Grid)
 
-    return Diagonal(f_to_grid((x,y) -> wall_step_function(x,y,delta,wall), grd))
+    return Diagonal(f_to_grid((x,y) -> smoothstep(x,y,delta,wall), grd))
 end
