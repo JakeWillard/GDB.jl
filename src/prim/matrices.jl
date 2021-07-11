@@ -20,7 +20,7 @@ function x_derivative(n, grid::Grid)
     Pinv = grid.inverse_projection
     P = grid.projection
 
-    return P * D * Pinv
+    return P * D * Pinv / (grid.dx)^n
 end
 
 
@@ -45,18 +45,13 @@ function y_derivative(n, grid::Grid)
     Pinv = grid.inverse_projection
     P = grid.projection
 
-    return P * D * Pinv
+    return P * D * Pinv / (grid.dy)^n
 end
 
 
 function laplacian(grid::Grid)
 
-    alpha = (grid.dx / grid.dy) ^2
-
-    Dxx = x_derivative(2, grid)
-    Dyy = y_derivative(2, grid)
-
-    return Dxx + alpha * Dyy
+    return x_derivative(2, grid) + y_derivative(2, grid)
 end
 
 
