@@ -63,7 +63,7 @@ end
 
 function interpolation_row(x, y, grid::Grid)
 
-    return interpolation_row(x, y, grid.MxyinvT, grid.Nx, grid.Ny, grid.mx, grid.my)
+    return interpolation_row(x, y, grid.origin[1], grid.origin[2], grid.dx, grid.dy, grid.MxyinvT, grid.Nx, grid.Ny, grid.mx, grid.my)
 end
 
 
@@ -91,11 +91,11 @@ end
 
 
 
-function reflection_matrix(delta, wall:Wall, grd::Grid)
+function reflection_matrix(delta, wall::Wall, grd::Grid)
 
     points = zeros(Float64, (2, grd.Nk))
 
-    for k=1:Nk
+    for k=1:grd.Nk
         x, y = grd.points[:,k]
         if 0 < smoothstep(x, y, delta, wall) < 1
             points[:,k] = wall.reflect(x, y)

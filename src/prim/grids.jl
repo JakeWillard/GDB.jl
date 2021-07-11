@@ -3,6 +3,7 @@
 struct Grid
 
     points::Matrix{Float64}
+    origin::Vector{Float64}
     projection::SparseMatrixCSC
     inverse_projection::SparseMatrixCSC
     mx::Int32
@@ -67,7 +68,7 @@ function Grid(walls::Vector{Wall}, deltas::Vector{Float64}, corners::Matrix{Floa
     Myinv = stencil1d(my)
     MxyinvT = stencil2d(mx, my)
 
-    return Grid(points[:,1:Nk], P, Pinv, mx, my, Nx, Ny, Nk, Mxinv, Myinv, MxyinvT, dx, dy)
+    return Grid(points[:,1:Nk], c1, P, Pinv, mx, my, Nx, Ny, Nk, Mxinv, Myinv, MxyinvT, dx, dy)
 end
 
 
@@ -122,7 +123,7 @@ function Grid(grd::Grid, walls::Vector{Wall}, deltas::Vector{Float64}, corners::
     Myinv = stencil1d(my)
     MxyinvT = stencil2d(mx, my)
 
-    return Grid(points[:,1:Nk], P, Pinv, mx, my, nx*grd.Nx, ny*grd.Ny, Nk, Mxinv, Myinv, MxyinvT, dx, dy)
+    return Grid(points[:,1:Nk], c1, P, Pinv, mx, my, nx*grd.Nx, ny*grd.Ny, Nk, Mxinv, Myinv, MxyinvT, dx, dy)
 end
 
 

@@ -48,12 +48,23 @@ function SimulationSetup(Lx, Ly, h, ds, N, n, m)
 
     # define corners and deltas
     corners = Float64[-Lx/2-h Lx/2+h; -Ly/2-h Ly/2+h]
-    crs_deltas = Float64[0.5, -0.5, 0.5]
-    fine_deltas = Float64[0.01, -0.01, 0.01]
+    crs_deltas = Float64[1, -4*(Lx-h)/Lx^2, 4*(Ly-h)/Ly^2] * 0.5
+    fine_deltas = Float64[1, -4*(Lx-h)/Lx^2, 4*(Ly-h)/Ly^2] * 0.0001
 
     # make grids
     crs_grd = Grid([outer_wall, x_flx, y_flx], crs_deltas, corners, N, m)
     fine_grd = Grid(crs_grd, [outer_wall, x_flx, y_flx], fine_deltas, corners, n, m)
+
+    # make penalization matrices
+    P1 = penalization_matrix(-4*ds*(Lx-h)/Lx^2, x_flx, fine_grd)
+    P2 = penalization_matrix(4*ds*(Ly-h)/Ly^2, y_flx, fine_grd)
+    P3 = penalization_matrix(ds, outer_wall, fine_grd)
+
+    # make reflection matrices
+    R1 = reflection_matrix(-4*ds*(Lx-h)/Lx^2, x_flx, fine_grd)
+    R2 = reflection_matrix(4*ds*(Ly-h)/Ly^2, y_flx, fine_grd)
+    R3 = reflection_matrix(ds, outer_wall, fine_grd)
+
 
     return SimulationSetup(fine_grd)
 end
