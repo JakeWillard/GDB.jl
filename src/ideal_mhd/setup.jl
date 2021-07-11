@@ -29,14 +29,23 @@ function b(x, y, Lx, Ly)
 end
 
 
-struct SimulationSetup
+struct MatrixData
 
     grd::Grid
+    P1::SparseMatrixCSC
+    P2::SparseMatrixCSC
+    P3::SparseMatrixCSC
+    R1::SparseMatrixCSC
+    R2::SparseMatrixCSC
+    R3::SparseMatrixCSC
+    Dx::SparseMatrixCSC
+    Dy::SparseMatrixCSC
+    L::SparseMatrixCSC
 
 end
 
 
-function SimulationSetup(Lx, Ly, h, ds, N, n, m)
+function MatrixData(Lx, Ly, h, ds, N, n, m)
 
     psi(x,y) = Psi(x, y, Lx, Ly)
     bx(x,y) = b(x,y,Lx,Ly)[1]
@@ -49,7 +58,7 @@ function SimulationSetup(Lx, Ly, h, ds, N, n, m)
     # define corners and deltas
     corners = Float64[-Lx/2-h Lx/2+h; -Ly/2-h Ly/2+h]
     crs_deltas = Float64[1, -4*(Lx-h)/Lx^2, 4*(Ly-h)/Ly^2] * 0.5
-    fine_deltas = Float64[1, -4*(Lx-h)/Lx^2, 4*(Ly-h)/Ly^2] * 0.0001
+    fine_deltas = Float64[1, -4*(Lx-h)/Lx^2, 4*(Ly-h)/Ly^2] * 0.3
 
     # make grids
     crs_grd = Grid([outer_wall, x_flx, y_flx], crs_deltas, corners, N, m)
@@ -62,9 +71,17 @@ function SimulationSetup(Lx, Ly, h, ds, N, n, m)
 
     # make reflection matrices
     R1 = reflection_matrix(-4*ds*(Lx-h)/Lx^2, x_flx, fine_grd)
+    println("")
+    println("computed R1")
     R2 = reflection_matrix(4*ds*(Ly-h)/Ly^2, y_flx, fine_grd)
+    println("computed R2")
     R3 = reflection_matrix(ds, outer_wall, fine_grd)
+    println("computed R3")
 
+    # make operators
+    Dx = x_derivative(1, fine_grd)
+    Dy = y_derivative(1, fine_grd)
+    L = laplacian(fine_grd)
 
-    return SimulationSetup(fine_grd)
+    return MatrixData(fine_grd, P1, P2, P3, R1, R2, R3, Dx, Dy, L)
 end
