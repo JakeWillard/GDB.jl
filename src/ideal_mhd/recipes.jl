@@ -1,14 +1,28 @@
 
 
-@userplot PlotSetup
+@userplot PlotVar
+@recipe function f(pv::PlotVar)
 
-@recipe function f(plt::PlotSetup)
+    var, grd, st = pv.args
+    z = vec_to_mesh(var, grd)
+    seriestype := st
 
-    grd = plt.args[1].grd
+    @series begin
+        z
+    end
+end
+
+
+@userplot PlotGrid
+@recipe function f(pg::PlotGrid)
+
+    grd = pg.args[1]
+    x = grd.points[1,:]
+    y = grd.points[2,:]
     seriestype := :scatter
     markersize := 1
 
     @series begin
-        grd.points[1,:], grd.points[2,:]
+        x, y
     end
 end
