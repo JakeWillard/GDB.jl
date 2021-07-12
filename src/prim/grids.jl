@@ -19,7 +19,7 @@ struct Grid
 
 end
 
-
+# XXX: Something wrong with projection matrix, must fix! 
 function Grid(walls::Vector{Wall}, deltas::Vector{Float64}, corners::Matrix{Float64}, N::Vector{Int}, m::Vector{Int})
 
     Nx, Ny = N
@@ -140,7 +140,7 @@ end
 
 
 
-function vec_to_mesh(vec::Vector{Float64}, grid::Grid)
+function vec_to_mesh(vec, grid::Grid)
 
     vals = grid.inverse_projection * vec
 

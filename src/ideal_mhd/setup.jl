@@ -29,7 +29,7 @@ function b(x, y, Lx, Ly)
 end
 
 
-struct MatrixData
+struct Setup
 
     grd::Grid
     P1::SparseMatrixCSC
@@ -45,7 +45,7 @@ struct MatrixData
 end
 
 
-function MatrixData(Lx, Ly, h, ds, N, n, m)
+function Setup(Lx, Ly, h, ds, N, n, m)
 
     psi(x,y) = Psi(x, y, Lx, Ly)
     bx(x,y) = b(x,y,Lx,Ly)[1]
@@ -83,5 +83,5 @@ function MatrixData(Lx, Ly, h, ds, N, n, m)
     Dy = y_derivative(1, fine_grd)
     L = laplacian(fine_grd)
 
-    return MatrixData(fine_grd, P1, P2, P3, R1, R2, R3, Dx, Dy, L)
+    return Setup(fine_grd, P1, P2, P3, R1, R2, R3, Dx, Dy, L)
 end

@@ -23,10 +23,10 @@ function load_sparse_matrix(fid, name)
 end
 
 
-function save_matrix_data(fid, matdat::MatrixData)
+function save_setup(fid, stp::Setup)
 
     # save grid
-    grd = matdat.grd
+    grd = stp.grd
     create_group(fid, "Grid")
     save_sparse_matrix(fid, grd.projection, "Grid/Proj")
     save_sparse_matrix(fid, grd.inverse_projection, "Grid/ProjInv")
@@ -39,19 +39,19 @@ function save_matrix_data(fid, matdat::MatrixData)
     fid["Grid/MxyinvT"] = grd.MxyinvT[:,:]
 
     # save other matrices
-    save_sparse_matrix(fid, matdat.P1, "P1")
-    save_sparse_matrix(fid, matdat.P2, "P2")
-    save_sparse_matrix(fid, matdat.P3, "P3")
-    save_sparse_matrix(fid, matdat.R1, "R1")
-    save_sparse_matrix(fid, matdat.R2, "R2")
-    save_sparse_matrix(fid, matdat.R3, "R3")
-    save_sparse_matrix(fid, matdat.Dx, "Dx")
-    save_sparse_matrix(fid, matdat.Dy, "Dy")
-    save_sparse_matrix(fid, matdat.L, "L")
+    save_sparse_matrix(fid, stp.P1, "P1")
+    save_sparse_matrix(fid, stp.P2, "P2")
+    save_sparse_matrix(fid, stp.P3, "P3")
+    save_sparse_matrix(fid, stp.R1, "R1")
+    save_sparse_matrix(fid, stp.R2, "R2")
+    save_sparse_matrix(fid, stp.R3, "R3")
+    save_sparse_matrix(fid, stp.Dx, "Dx")
+    save_sparse_matrix(fid, stp.Dy, "Dy")
+    save_sparse_matrix(fid, stp.L, "L")
 end
 
 
-function load_matrix_data(fid)
+function load_setup(fid)
 
     # load grid
     points = fid["Grid/points"][:,:]
@@ -76,5 +76,5 @@ function load_matrix_data(fid)
     Dy = load_sparse_matrix(fid, "Dy")
     L = load_sparse_matrix(fid, "L")
 
-    return MatrixData(grd, P1, P2, P3, R1, R2, R3, Dx, Dy, L)
+    return Setup(grd, P1, P2, P3, R1, R2, R3, Dx, Dy, L)
 end
