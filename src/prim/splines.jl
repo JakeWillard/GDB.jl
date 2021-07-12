@@ -57,7 +57,7 @@ function interpolation_row(x, y, x0, y0, dx, dy, MinvT, Nx, Ny, mx, my)
     jcs = Int(ceil(my/2.0))
 
     # indices for center point in grid
-    icg = Int(floor((x - x0)/dx))
+    icg = Int(floor((x - x0)/dx)) #XXX I think this is actually off by one... but why wouldn't that already be obvious?...
     jcg = Int(floor((y - y0)/dy))
 
     # values for row

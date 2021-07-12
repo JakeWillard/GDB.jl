@@ -19,7 +19,7 @@ struct Grid
 
 end
 
-# XXX: Something wrong with projection matrix, must fix! 
+
 function Grid(walls::Vector{Wall}, deltas::Vector{Float64}, corners::Matrix{Float64}, N::Vector{Int}, m::Vector{Int})
 
     Nx, Ny = N
@@ -71,7 +71,7 @@ function Grid(walls::Vector{Wall}, deltas::Vector{Float64}, corners::Matrix{Floa
     return Grid(points[:,1:Nk], c1, P, Pinv, mx, my, Nx, Ny, Nk, Mxinv, Myinv, MxyinvT, dx, dy)
 end
 
-
+# WARNING: something wrong with the projection matrices here, not a problem in common with the other Grid constructor!
 function Grid(grd::Grid, walls::Vector{Wall}, deltas::Vector{Float64}, corners::Matrix{Float64}, n::Vector{Int}, m::Vector{Int})
 
     nx, ny = n
@@ -84,6 +84,9 @@ function Grid(grd::Grid, walls::Vector{Wall}, deltas::Vector{Float64}, corners::
     dy = grd.dy / ny
     Nk = 0
 
+    # get nonzero rows from coarse projection matrix
+    dummy, J, dummmy = findnz(grd.projection)
+
     proj_rows = Int32[i for i=1:Nxy]
     proj_cols = zeros(Int32, Nxy)
     proj_vals = ones(Int32, Nxy)
@@ -93,10 +96,16 @@ function Grid(grd::Grid, walls::Vector{Wall}, deltas::Vector{Float64}, corners::
             for i=1:nx
                 x = grd.points[1,k] + (i-1) * dx
                 y = grd.points[2,k] + (j-1) * dx
-                ii = Int(floor((x - c1[1]) / dx))
-                jj = Int(floor((y - c1[2]) / dy))
-                inside = true
 
+                # compute (i,j) coordinates on coarse grid
+                crs_i = rem(J[k], grd.Ny)
+                crs_j = div(J[k], grd.Ny)
+
+                # compute (i,j) coordinates on fine grid
+                fn_i = (crs_i-1)*nx + i
+                fn_j = (crs_j-1)*ny + j
+
+                inside = true
                 for l=1:length(walls)
                     if smoothstep(x, y, deltas[l], walls[l]) == 0
                         inside = false
@@ -107,7 +116,7 @@ function Grid(grd::Grid, walls::Vector{Wall}, deltas::Vector{Float64}, corners::
                 if inside
                     Nk += 1
                     points[:,Nk] = [x, y]
-                    proj_cols[Nk] = ii + nx*grd.Nx*(jj-1)
+                    proj_cols[Nk] = fn_i + nx*grd.Nx*(fn_j-1)
                 end
 
             end

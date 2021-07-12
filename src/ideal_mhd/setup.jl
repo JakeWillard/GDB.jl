@@ -58,11 +58,13 @@ function Setup(Lx, Ly, h, ds, N, n, m)
     # define corners and deltas
     corners = Float64[-Lx/2-h Lx/2+h; -Ly/2-h Ly/2+h]
     crs_deltas = Float64[1, -4*(Lx-h)/Lx^2, 4*(Ly-h)/Ly^2] * 0.5
-    fine_deltas = Float64[1, -4*(Lx-h)/Lx^2, 4*(Ly-h)/Ly^2] * 0.3
+    fine_deltas = Float64[1, -4*(Lx-h)/Lx^2, 4*(Ly-h)/Ly^2] * ds*2
 
     # make grids
     crs_grd = Grid([outer_wall, x_flx, y_flx], crs_deltas, corners, N, m)
     fine_grd = Grid(crs_grd, [outer_wall, x_flx, y_flx], fine_deltas, corners, n, m)
+
+    # fine_grd = crs_grd
 
     # make penalization matrices
     P1 = penalization_matrix(-4*ds*(Lx-h)/Lx^2, x_flx, fine_grd)
