@@ -6,6 +6,7 @@ struct Grid
     origin::Vector{Float64}
     projection::SparseMatrixCSC
     inverse_projection::SparseMatrixCSC
+    nanmask::Matrix{Float64}
     mx::Int32
     my::Int32
     Nx::Int32
@@ -37,6 +38,8 @@ function Grid(walls::Vector{Wall}, deltas::Vector{Float64}, corners::Matrix{Floa
     proj_cols = zeros(Int32, Nxy)
     proj_vals = ones(Int32, Nxy)
 
+    nanmask = fill(NaN, (Nx, Ny))
+
     for j=1:Ny
         for i=1:Nx
             x = c1[1] + (i-1) * dx
@@ -54,6 +57,7 @@ function Grid(walls::Vector{Wall}, deltas::Vector{Float64}, corners::Matrix{Floa
                 Nk += 1
                 points[:,Nk] = [x, y]
                 proj_cols[Nk] = i + Nx*(j-1)
+                nanmask[i,j] = 1.0
             end
 
         end
@@ -68,10 +72,10 @@ function Grid(walls::Vector{Wall}, deltas::Vector{Float64}, corners::Matrix{Floa
     Myinv = stencil1d(my)
     MxyinvT = stencil2d(mx, my)
 
-    return Grid(points[:,1:Nk], c1, P, Pinv, mx, my, Nx, Ny, Nk, Mxinv, Myinv, MxyinvT, dx, dy)
+    return Grid(points[:,1:Nk], c1, P, Pinv, nanmask, mx, my, Nx, Ny, Nk, Mxinv, Myinv, MxyinvT, dx, dy)
 end
 
-# WARNING: something wrong with the projection matrices here, not a problem in common with the other Grid constructor!
+
 function Grid(grd::Grid, walls::Vector{Wall}, deltas::Vector{Float64}, corners::Matrix{Float64}, n::Vector{Int}, m::Vector{Int})
 
     nx, ny = n
@@ -90,6 +94,10 @@ function Grid(grd::Grid, walls::Vector{Wall}, deltas::Vector{Float64}, corners::
     proj_rows = Int32[i for i=1:Nxy]
     proj_cols = zeros(Int32, Nxy)
     proj_vals = ones(Int32, Nxy)
+
+    # nanmask is useful for data visualization, represent points outside the
+    # domain with NaN
+    nanmask = fill(NaN, (nx*grd.Nx, ny*grd.Ny))
 
     for k=1:grd.Nk
         for j=1:ny
@@ -117,6 +125,7 @@ function Grid(grd::Grid, walls::Vector{Wall}, deltas::Vector{Float64}, corners::
                     Nk += 1
                     points[:,Nk] = [x, y]
                     proj_cols[Nk] = fn_i + nx*grd.Nx*(fn_j-1)
+                    nanmask[fn_i, fn_j] = 1.0
                 end
 
             end
@@ -132,7 +141,7 @@ function Grid(grd::Grid, walls::Vector{Wall}, deltas::Vector{Float64}, corners::
     Myinv = stencil1d(my)
     MxyinvT = stencil2d(mx, my)
 
-    return Grid(points[:,1:Nk], c1, P, Pinv, mx, my, nx*grd.Nx, ny*grd.Ny, Nk, Mxinv, Myinv, MxyinvT, dx, dy)
+    return Grid(points[:,1:Nk], c1, P, Pinv, nanmask, mx, my, nx*grd.Nx, ny*grd.Ny, Nk, Mxinv, Myinv, MxyinvT, dx, dy)
 end
 
 
@@ -151,6 +160,7 @@ end
 
 function vec_to_mesh(vec, grid::Grid)
 
+
     vals = grid.inverse_projection * vec
 
     Nx = grid.Nx
@@ -161,7 +171,7 @@ function vec_to_mesh(vec, grid::Grid)
         out[:,j] = vals[1+(j-1)*Nx:j*Nx]
     end
 
-    return out
+    return out .* grid.nanmask
 end
 
 

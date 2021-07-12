@@ -72,12 +72,12 @@ function Setup(Lx, Ly, h, ds, N, n, m)
     P3 = penalization_matrix(ds, outer_wall, fine_grd)
 
     # make reflection matrices
-    R1 = reflection_matrix(-4*ds*(Lx-h)/Lx^2, x_flx, fine_grd)
+    R1 = reflection_matrix(-8*ds*(Lx-h)/Lx^2, x_flx, fine_grd)
     println("")
     println("computed R1")
-    R2 = reflection_matrix(4*ds*(Ly-h)/Ly^2, y_flx, fine_grd)
+    R2 = reflection_matrix(8*ds*(Ly-h)/Ly^2, y_flx, fine_grd)
     println("computed R2")
-    R3 = reflection_matrix(ds, outer_wall, fine_grd)
+    R3 = reflection_matrix(2*ds, outer_wall, fine_grd)
     println("computed R3")
 
     # make operators
