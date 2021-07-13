@@ -6,3 +6,4 @@
 /src/devtools.jl
 *.h5
 *.gif
+*.svg
