@@ -13,6 +13,18 @@
 end
 
 
+@userplot PlotGrid
+@recipe function f(pg::PlotGrid)
+
+    grd, clr = pg.args
+    z = vec_to_mesh(ones(Float64, grd.Nk), grd)
+    seriestype := :heatmap
+    fillcolor := clr
+    colorbar := false
+    @series begin z end
+end
+
+
 @userplot PlotSetup
 @recipe function f(ps::PlotSetup)
 
@@ -27,14 +39,6 @@ end
     p3 = vec_to_mesh(stp.R3*pvec, stp.grd)
 
     layout := @layout [b c; d e]
-
-    # @series begin
-    #     subplot := 1
-    #     seriestype := :scatter
-    #     markersize := 0.5
-    #     x, y
-    # end
-
     seriestype := :heatmap
     colorbar := false
 
