@@ -49,20 +49,20 @@ function stencil2d(mx, my)
     return transpose(inv(M))
 end
 
-
-function interpolation_row(x, y, MinvT, Nx, Ny, mx, my)
+# XXX not generalized for corners, must fix!
+function interpolation_row(x, y, x0, y0, dx, dy, MinvT, Nx, Ny, mx, my)
 
     # (i,j) indices for center point of stencil
     ics = Int(ceil(mx/2.0))
     jcs = Int(ceil(my/2.0))
 
     # indices for center point in grid
-    icg = Int(floor(x*Nx))
-    jcg = Int(floor(y*Ny))
+    icg = Int(floor((x - x0)/dx)) #XXX I think this is actually off by one... but why wouldn't that already be obvious?...
+    jcg = Int(floor((y - y0)/dy))
 
     # values for row
-    xr = x*Nx - icg
-    yr = y*Ny - jcg
+    xr = (x - x0)/dx - icg
+    yr = (y - y0)/dy - jcg
     spline = spline2d(xr, yr, mx, my)
     row_dat = MinvT * spline
 

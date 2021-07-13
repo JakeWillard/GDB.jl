@@ -5,6 +5,8 @@ export test_simulation
 using Distributed
 using LinearAlgebra
 using SparseArrays
+using HDF5
+using RecipesBase
 
 include("./prim/splines.jl")
 include("./prim/grids.jl")

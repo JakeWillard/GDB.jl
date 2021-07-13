@@ -20,7 +20,7 @@ function x_derivative(n, grid::Grid)
     Pinv = grid.inverse_projection
     P = grid.projection
 
-    return P * D * Pinv
+    return P * D * Pinv / (grid.dx)^n
 end
 
 
@@ -45,25 +45,20 @@ function y_derivative(n, grid::Grid)
     Pinv = grid.inverse_projection
     P = grid.projection
 
-    return P * D * Pinv
+    return P * D * Pinv / (grid.dy)^n
 end
 
 
 function laplacian(grid::Grid)
 
-    alpha = (grid.dx / grid.dy) ^2
-
-    Dxx = x_derivative(2, grid)
-    Dyy = y_derivative(2, grid)
-
-    return Dxx + alpha * Dyy
+    return x_derivative(2, grid) + y_derivative(2, grid)
 end
 
 
 
 function interpolation_row(x, y, grid::Grid)
 
-    return interpolation_row(x, y, grid.MxyinvT, grid.Nx, grid.Ny, grid.mx, grid.my)
+    return interpolation_row(x, y, grid.origin[1], grid.origin[2], grid.dx, grid.dy, grid.MxyinvT, grid.Nx, grid.Ny, grid.mx, grid.my)
 end
 
 
@@ -91,20 +86,24 @@ end
 
 
 
-function reflection_matrix(wall:Wall, grd::Grid)
+function reflection_matrix(delta, wall::Wall, grd::Grid)
 
-    points = zeros(Float64, grd.Nk)
-    n = 0
+    points = zeros(Float64, (2, grd.Nk))
 
-    for k=1:Nk
+    for k=1:grd.Nk
         x, y = grd.points[:,k]
-        if 0 < wall.sstep(x,y) < 1
-            n += 1
-            points[:,n] = wall.reflect(x, y)
+        if 0 < smoothstep(x, y, delta, wall) < 1
+            points[:,k] = wall.reflect(x, y)
         else
-            points[:,n] = grd.points[:,k]
+            points[:,k] = grd.points[:,k]
         end
     end
 
     return interpolation_matrix(points, grd)
+end
+
+
+function penalization_matrix(delta, wall::Wall, grd::Grid)
+
+    return Diagonal(f_to_grid((x,y) -> smoothstep(x,y,delta,wall), grd))
 end

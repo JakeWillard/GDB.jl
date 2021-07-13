@@ -52,34 +52,19 @@ function ray_reflection(x, y, r1, r2)
 end
 
 
-function smoothstep(x)
-
-    if x < 0
-        return 0
-    elseif 0 < x < 1
-        return 3*x^2 - 2*x^3
-    else
-        return 1
-    end
-end
-
-
 struct Wall
 
-    sstep::Function
+    # surface defined as points where func(x,y) = val
+    func::Function
+    val::Float64
     reflect::Function
 
 end
 
 
-function PolyWall(vert, ds)
+function PolyWall(vert)
 
-    function sstep(x, y)
-
-        h, ns = poly_dist(x, y, vert)
-        u = h / ds
-        return smoothstep(u)
-    end
+    func(x,y) = poly_dist(x, y, vert)[1]
 
     function reflect(x, y)
 
@@ -89,19 +74,27 @@ function PolyWall(vert, ds)
         return ray_reflection(x, y, r1, r2)
     end
 
-    return Wall(sstep, reflect)
+    return Wall(func, 0.0, reflect)
 end
 
 
-function FluxWall(psi, psi0, bx, by, ds, dp)
-
-    function sstep(x, y)
-
-        u = (psi(x, y) - psi0) / dp
-        return smoothstep(u)
-    end
+function FluxWall(psi, psi0, bx, by, ds)
 
     reflect(x, y) = trace_reflection(x, y, psi, bx, by, psi0, ds)
 
-    return Wall(sstep, reflect)
+    return Wall(psi, psi0, reflect)
+end
+
+
+function smoothstep(x, y, delta, wall::Wall)
+
+    u = (wall.func(x,y) - wall.val) / delta + 0.5
+
+    if u < 0
+        return 0
+    elseif 0 < u < 1
+        return 3*u^2 - 2*u^3
+    else
+        return 1
+    end
 end
