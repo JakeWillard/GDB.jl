@@ -8,10 +8,16 @@ using SparseArrays
 using HDF5
 using RecipesBase
 
-include("./prim/splines.jl")
-include("./prim/grids.jl")
-include("./prim/matrices.jl")
-include("./prim/jacobi.jl")
+include("/home/jake/Documents/GDB.jl/src/prim/trace.jl")
+include("/home/jake/Documents/GDB.jl/src/prim/walls.jl")
+include("/home/jake/Documents/GDB.jl/src/prim/splines.jl")
+include("/home/jake/Documents/GDB.jl/src/prim/grids.jl")
+include("/home/jake/Documents/GDB.jl/src/prim/matrices.jl")
+include("/home/jake/Documents/GDB.jl/src/prim/vars.jl")
+
+include("/home/jake/Documents/GDB.jl/src/ideal_mhd/setup.jl")
+include("/home/jake/Documents/GDB.jl/src/ideal_mhd/io.jl")
+include("/home/jake/Documents/GDB.jl/src/ideal_mhd/recipes.jl")
 
 
 
