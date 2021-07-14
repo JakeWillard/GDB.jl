@@ -1,9 +1,9 @@
 
-@variable "LogDensity"
-@variable "Flux"
-@variable "Stream"
-@variable "Vorticity"
-@variable "Current"
+@variable2d "LogDensity"
+@variable2d "Flux"
+@variable2d "Stream"
+@variable2d "Vorticity"
+@variable2d "Current"
 
 # LogDensity(x::Vector{Float64}) = LogDensity{Float64, 2}(hcat(x, x))
 # Flux(x::Vector{Float64}) = Flux{Float64, 2}(hcat(x, x))
@@ -66,9 +66,6 @@ function partial_t(psi::Flux, phi::Stream, j::Current, eta::Float64, stp::Setup)
     # compute poisson bracket
     psi_t = (stp.Dx*psi[:,2]) .* (stp.Dy*phi[:,2]) .- (stp.Dx*phi[:,2]) .* (stp.Dy*psi[:,2])
 
-    # compute current term
-    psi_t += eta * j[:,2]
-
     # Dirichlet conditions on every surface
     psi_t = stp.P1*psi_t + 0.5*(I - P1)*(R1 + I)*psi[:,2]
     psi_t = stp.P2*psi_t + 0.5*(I - P1)*(R2 + I)*psi[:,2]
@@ -124,6 +121,13 @@ function solve_diffusion(lnn::LogDensity, Cdiff::Float64, stp::Setup)
     lnn_src = 0.3
     rhs = stp.P1 * lnn[:,2] + lnn_src*diag(I - stp.P1)
     rhs = (stp.P2*stp.P3) * rhs[:]
+
+    # turn into least-squares problem
+    rhs = transpose(A) * rhs[:]
+    A = transpose(A) * A
+
+    # solve with backslash
+    return A \ rhs
 end
 
 
@@ -141,15 +145,27 @@ function leapfrog!(lnn::LogDensity, w::Vorticity, psi::Flux, phi::Stream, j::Cur
     phi_p = Stream(solve_vorticity_eqn(phi_b, w_p, stp))
     j_p = Current(stp.L * psi_p)
 
+    # apply diffusion
+    lnn_p = LogDensity(solve_diffusion(lnn_p, Cdiff, stp))
+    w_p = Vorticity(solve_diffusion(w_p, Cdiff, stp))
+    psi_p = Flux(solve_diffusion(psi_p, eta, stp))
+
     # recompute time derivatives
     lnn_t_new = partial_t(lnn_p, phi_p, stp)
     w_t_new = partial_t(w_p, phi_p, psi_p, j_p, stp)
     psi_t_new = partial_t(psi_p, phi_p, j_p, eta, stp)
 
-    # compute final values
+    # compute complete time steps
     lnn_f = lnn[2,:] + dt*lnn_t_new
     w_f = w[2,:] + dt*w_t_new
     psi_f = psi[2,:] + dt*psi_t_new
+
+    # apply diffusion
+    lnn_f = LogDensity(solve_diffusion(lnn_f, Cdiff, stp))
+    w_f = Vorticity(solve_diffusion(w_f, Cdiff, stp))
+    psi_f = Flux(solve_diffusion(psi_f, eta, stp))
+
+    # shift values
     lnn[1,:] = lnn[2,:]
     lnn[2,:] = lnn_f[:]
     w[1,:] = w[2,:]
