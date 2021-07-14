@@ -78,7 +78,7 @@ function simulate(init_path, stp_path, dt, eta, Cdiff, n)
     stp = load_setup(fid_stp)
     close(fid_stp)
 
-    for 2=1:N
+    for dummy=1:N
         integrate_then_save!(init_path, n, lnn, w, psi, phi, j, phi, dt, eta, Cdiff, stp)
     end
 end
