@@ -83,8 +83,8 @@ function solve_vorticity_eqn(phi_b::Stream, w::Vorticity, stp::Setup)
     # clamp to phi_b (given boundary value) on flux surfaces
     A = stp.P1 * stp.L + 0.5*(I - stp.P1)*(stp.R1 + I)
     A = stp.P2 * A + 0.5*(I - stp.P2)*(stp.R2 + I)
-    rhs = stp.P1*w[:,2] + 0.5*(I - stp.P1)*(stp.R1 + I)*phi_b[:]
-    rhs = stp.P2*rhs[:] + 0.5*(I - stp.P2)*(stp.R2 + I)*phi_b[:]
+    rhs = stp.P1*w[:,2] + 0.5*(I - stp.P1)*(stp.R1 + I)*phi_b[:,2]
+    rhs = stp.P2*rhs[:] + 0.5*(I - stp.P2)*(stp.R2 + I)*phi_b[:,2]
 
     # no-slip conditions on hard surfaces
     A = stp.P3 * A + 0.5*(I - stp.P3)*(stp.R3 - I)
