@@ -161,3 +161,21 @@ function leapfrog!(lnn::LogDensity, w::Vorticity, psi::Flux, phi::Stream, j::Cur
     j[1,:] = j[2,:]
     j[2,:] = stp.L * psi[2,:]
 end
+
+
+function integrate_then_save!(path::String, N::Int32, lnn::LogDensity, w::Vorticity, psi::Flux, phi::Stream, j::Current, phi_b::Stream, dt::Float64, eta::Float64, Cdiff::Float64, stp::Setup)
+
+    for dummy=1:N
+        leapfrog!(lnn, w, psi, phi, j, phi_b, dt, eta, Cdiff, stp)
+    end
+
+    fid = h5open(path, "r+")
+    t = fid["t"]
+    fid["LogDensity"][:,t] = lnn[:,2]
+    fid["Fux"][:,t] = psi[:,2]
+    fid["Stream"][:,t] = phi[:,2]
+    fid["Vorticity"][:,t] = w[:,2]
+    fid["Current"][:,t] = j[:,2]
+    fid["t"] = t + 1
+    close(fid)
+end
