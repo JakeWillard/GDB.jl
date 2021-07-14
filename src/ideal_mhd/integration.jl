@@ -5,11 +5,11 @@
 @variable "Vorticity"
 @variable "Current"
 
-LogDensity(x::Vector{Float64}) = LogDensity{Float64, 2}(hcat(x, x))
-Flux(x::Vector{Float64}) = Flux{Float64, 2}(hcat(x, x))
-Stream(x::Vector{Float64}) = Stream{Float64, 2}(hcat(x, x))
-Vorticity(x::Vector{Float64}) = Vorticity{Float64, 2}(hcat(x, x))
-Current(x::Vector{Float64}) = Current{Float64, 2}(hcat(x, x))
+# LogDensity(x::Vector{Float64}) = LogDensity{Float64, 2}(hcat(x, x))
+# Flux(x::Vector{Float64}) = Flux{Float64, 2}(hcat(x, x))
+# Stream(x::Vector{Float64}) = Stream{Float64, 2}(hcat(x, x))
+# Vorticity(x::Vector{Float64}) = Vorticity{Float64, 2}(hcat(x, x))
+# Current(x::Vector{Float64}) = Current{Float64, 2}(hcat(x, x))
 
 
 """
