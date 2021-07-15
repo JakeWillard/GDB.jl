@@ -48,8 +48,8 @@ function simple(Lx, Ly, h, ds, Nx, Ny, m)
     outer_wall = Rectangle(Lx, Ly)
     corners = Float64[-Lx/2-h Lx/2+h; -Ly/2-h Ly/2+h]
     deltas = Float64[ds]
-    crs_grd = Grid([outer_wall], deltas, corners, [Nx,Ny], 3)
-    return crs_grd, outer_wall, corners, deltas
+    crs_grd = Grid([outer_wall], deltas, corners, [Nx, Ny], [3,3])
+    return crs_grd, outer_wall, deltas, corners
 end
 
 function Setup(Lx, Ly, h, ds, N, n, m)

@@ -2,8 +2,8 @@ function transformation_matrices(Nx::Int32, Ny::Int32)
     # calculates the interpolation and restriction matrices given a certain resolution in each direction
     # Nx = grid.Nx
     # Ny = grid.Ny
-    coarsexres = Nx/2
-    coarseyres = Ny/2
+    coarsexres = Int32(Nx/2)
+    coarseyres = Int32(Ny/2)
 
     xcoarse = zeros(Float64, coarsexres)
     ycoarse = zeros(Float64, coarseyres)  # using the reduction in number of points from the paper
@@ -14,15 +14,16 @@ function transformation_matrices(Nx::Int32, Ny::Int32)
     
     # only working in 1D so far
     Interpx = zeros(Nx, coarsexres)
-    Restrx1D = zeros(coarsexres, Nx)
-    Restrx = zeros(coarsexres, Nx)
+    # Restrx1D = zeros(coarsexres, Nx)
 
     for i=1:Nx
         for j=1:coarsexres
             # sort of brute force based on the form of the interpolation matrix given in the MIT site
             Interpx[2(j-1)+1, j] = .5
             Interpx[2(j-1)+2, j] = 1
-            Interpx[2(j-1)+3, j] = .5
+            if 2(j-1)+3 <= i
+                Interpx[2(j-1)+3, j] = .5
+            end
             # may not need outer loop if indexing only depends on j
         end
     end
@@ -52,7 +53,7 @@ function transformation_matrices(Nx::Int32, Ny::Int32)
 
     # Restrx = .25*transpose(Interpx) # definition of restriction matrix
     Restr2d = kron(Restrx1D, Restrx1D) # assuming we're using the 1D matrix
-    Interp2d = 4*transpose(Restr2D)
+    Interp2d = 4*transpose(Restr2d)
     # same Interpolation/Restriction matrices in x and y?
 
     return Restr2d, Interp2d, coarsexres, coarseyres
@@ -234,7 +235,7 @@ function v_cycle(grid::Grid, A::SparseMatrixCSC, xcalc::Vector{Float64}, b::Vect
     b3 = R3 * b2
 
 
-    Einitial = zeros({Float64}, size(xcalc))
+    Einitial = zeros(Float64, size(xcalc))
     Ecoarse1 = R1 * Einitial
     Ecoarse1_1 = jacobi_smooth(Acoarse1, Ecoarse1, rcoarse1, 1, 1, 1, 1, .1)
     Ecoarse2 = R2 * Ecoarse1_1
@@ -273,11 +274,11 @@ function v_cycle_general(grids::Diffresgrids, A::SparseMatrixCSC, x::Vector{Floa
     - run cycle again using the new error/residual to get error
     IF AT LOWEST RESOLUTION
     - error is given by smoothing function at lowest resolution"""
-    
+
     Acoarse1 = project_to_coarse(A, Nx, Ny, R1, I1)
     x1 = R1 * x
     b1 = R1 * b
-    Einitial1 = zeros({Float64}, size(x1))
+    Einitial1 = zeros(Float64, size(x1))
     Ecoarse1 = jacobi_smooth(Acoarse1, Einitial1, rcoarse1, 1, 1, 1, 1, .1)
     rcoarse1 = Acoarse1 * Ecoarse1
     rcoarse2 = R2 * rcoarse1
@@ -285,7 +286,7 @@ function v_cycle_general(grids::Diffresgrids, A::SparseMatrixCSC, x::Vector{Floa
     Acoarse2 = project_to_coarse(Acoarse1, Nx1, Ny1, R2, I2)
     x2 = R2 * x1
     b2 = R2 * b1
-    Einitial2 = zeros({Float64}, size(x2))
+    Einitial2 = zeros(Float64, size(x2))
     Ecoarse2 = jacobi_smooth(Acoarse2, Einitial2, rcoarse2, 1, 1, 1, 1, .1)
     rcoarse2_1 = Acoarse2 * Ecoarse2
     rcoarse3 = R3 * rcoarse2_1
@@ -293,7 +294,7 @@ function v_cycle_general(grids::Diffresgrids, A::SparseMatrixCSC, x::Vector{Floa
     Acoarse3 = project_to_coarse(Acoarse2, Nx2, Ny2, R3, I3)
     x3 = R3 * x2
     b3 = R3 * b2
-    Einitial3 = zeros({Float64}, size(x3))
+    Einitial3 = zeros(Float64, size(x3))
     Ecoarse3 = jacobi_smooth(Acoarse3, Einitial3, rcoarse3, 1, 1, 1, 1, .1)
     rcoarse3_1 = Acoarse3 * Ecoarse3
     rcoarse2_2 = I3 * rcoarse3_1
