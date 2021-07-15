@@ -47,7 +47,7 @@ function p_jacobi(A::SparseMatrixCSC, x::Vector{Float64}, b::Vector{Float64}, w:
             # serial
             xnext[:] = M * xnext + f # actual equation describing the Jacobi iteration
             # parallel
-            xnext[:] = sum(pmap(i -> relax(M, xnext, f, nodes[i], nodes[i+1]-1, n) : i, 1:chunks-1)) # shouldn't use both versions at once
+            # xnext[:] = sum(pmap(i -> relax(M, xnext, f, nodes[i], nodes[i+1]-1, n) : i, 1:chunks-1)) # shouldn't use both versions at once
             # how to get rid of repeated indices without getting rid of last element?
         end
         
@@ -95,7 +95,7 @@ function jacobi_smooth(A::SparseMatrixCSC, x::Vector{Float64}, b::Vector{Float64
         # serial
         xnext[:] = M * xnext + f # actual equation describing the Jacobi iteration
         # parallel
-        xnext[:] = sum(pmap(i -> relax(M, xnext, f, nodes[i], nodes[i+1]-1, n) : i, 1:chunks-1)) # shouldn't use both versions at once
+        # xnext[:] = sum(pmap(i -> relax(M, xnext, f, nodes[i], nodes[i+1]-1, n) : i, 1:chunks-1)) # shouldn't use both versions at once
         # how to get rid of repeated indices without getting rid of last element?
     end
        

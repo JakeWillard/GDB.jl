@@ -265,23 +265,50 @@ function v_cycle_general(grids::Diffresgrids, A::SparseMatrixCSC, x::Vector{Floa
     I3 = grids.I3p
 
     # calculating the form of the matrix/residual at different resolutions
-    rcoarse1 = R1 * residual(A, x, b)
+    """- error is calculated through smoothing (using given error and residual)
+    - residual is calculated using error and previous residual as well as spacing
+    - residual is restricted
+    - error is set to 0
+    IF NOT AT LOWEST RESOLUTION
+    - run cycle again using the new error/residual to get error
+    IF AT LOWEST RESOLUTION
+    - error is given by smoothing function at lowest resolution"""
+    
     Acoarse1 = project_to_coarse(A, Nx, Ny, R1, I1)
     x1 = R1 * x
     b1 = R1 * b
+    Einitial1 = zeros({Float64}, size(x1))
+    Ecoarse1 = jacobi_smooth(Acoarse1, Einitial1, rcoarse1, 1, 1, 1, 1, .1)
+    rcoarse1 = Acoarse1 * Ecoarse1
+    rcoarse2 = R2 * rcoarse1
 
-    rcoarse2 = R2 * residual(Acoarse1, x1, b1)
     Acoarse2 = project_to_coarse(Acoarse1, Nx1, Ny1, R2, I2)
     x2 = R2 * x1
     b2 = R2 * b1
+    Einitial2 = zeros({Float64}, size(x2))
+    Ecoarse2 = jacobi_smooth(Acoarse2, Einitial2, rcoarse2, 1, 1, 1, 1, .1)
+    rcoarse2_1 = Acoarse2 * Ecoarse2
+    rcoarse3 = R3 * rcoarse2_1
 
-    rcoarse3 = R3 * residual(Acoarse2, x2, b2)
     Acoarse3 = project_to_coarse(Acoarse2, Nx2, Ny2, R3, I3)
     x3 = R3 * x2
     b3 = R3 * b2
+    Einitial3 = zeros({Float64}, size(x3))
+    Ecoarse3 = jacobi_smooth(Acoarse3, Einitial3, rcoarse3, 1, 1, 1, 1, .1)
+    rcoarse3_1 = Acoarse3 * Ecoarse3
+    rcoarse2_2 = I3 * rcoarse3_1
+
+    Ecoarse2_1 = jacobi_smooth(Acoarse2, Einitial2, rcoarse2_2, 1, 1, 1, 1, .1)
+    rcoarse2_3 = Acoarse2 * Ecoarse2_1
+    rcoarse1_2 = I2 * rcoarse2_3
+
+    Ecoarse1_1 = jacobi_smooth(Acoarse1, Einitial1, rcoarse1_2, 1, 1, 1, 1, .1)
+    rcoarse1_3 = Acoarse1 * Ecoarse1_1 # these two calculations may not be necessary
+    rfine = I1 * rcoarse1_3
+    Efine = Ecoarse1_1
 
     # actual v-cycle steps
-    Einitial = zeros({Float64}, size(x))
+    """Einitial = zeros({Float64}, size(x))
     Ecoarse1 = R1 * Einitial
     Ecoarse1_1 = jacobi_smooth(Acoarse1, Ecoarse1, rcoarse1, 1, 1, 1, 1, .1)
     Ecoarse2 = R2 * Ecoarse1_1
@@ -292,7 +319,7 @@ function v_cycle_general(grids::Diffresgrids, A::SparseMatrixCSC, x::Vector{Floa
     Ecoarse2_3 = jacobi_smooth(Acoarse2, Ecoarse2_2, rcoarse2, 1, 1, 1, 1, .1)
     Ecoarse1_2 = I2 * Ecoarse2_3
     Ecoarse1_3 = jacobi_smooth(Acoarse1, Ecoarse1_2, rcoarse1, 1, 1, 1, 1, .1)
-    Efine = I1 * Ecoarse1_3
+    Efine = I1 * Ecoarse1_3"""
 
     x = x + Efine
 
