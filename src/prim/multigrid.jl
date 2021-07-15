@@ -2,8 +2,8 @@ function transformation_matrices(Nx::Int32, Ny::Int32)
     # calculates the interpolation and restriction matrices given a certain resolution in each direction
     # Nx = grid.Nx
     # Ny = grid.Ny
-    coarsexres = ceil((Nx-1)/2)
-    coarseyres = ceil((Ny-1)/2)
+    coarsexres = Nx/2
+    coarseyres = Ny/2
 
     xcoarse = zeros(Float64, coarsexres)
     ycoarse = zeros(Float64, coarseyres)  # using the reduction in number of points from the paper
@@ -111,7 +111,7 @@ function project_to_coarse(A::SparseMatrixCSC, Nx::Int32, Ny::Int32, R::Matrix{F
     return Acoarse
 end
 
-function correction_matrix(A::SparseMatrixCSC}, Nx::Int32, Ny::Int32)
+function correction_matrix(A::SparseMatrixCSC, Nx::Int32, Ny::Int32)
     # calculates the error correction matrix s
 
     # acquiring restriction and interpolation matrices
@@ -150,7 +150,7 @@ function restricted_residual(A::SparseMatrixCSC, x::Vector{Float64}, b::Vector{F
     return rcoarse
 end
 
-function multigrid_error(e::Vector{Float64}, A::SparseMatrixCSC}, Nx::Int32, Ny::Int32)
+function multigrid_error(e::Vector{Float64}, A::SparseMatrixCSC, Nx::Int32, Ny::Int32)
     # given the error e = x(guessed) - x(calculated), this gives the multigrid error correction
 
     # calculation of correction matrix S that maps from coarse to fine grid
@@ -235,8 +235,9 @@ function v_cycle(grid::Grid, A::SparseMatrixCSC, xcalc::Vector{Float64}, b::Vect
 
 
     Einitial = zeros({Float64}, size(xcalc))
-    Ecoarse1 = jacobi_smooth(Acoarse1, Einitial, rcoarse1, 1, 1, 1, 1, .1)
-    Ecoarse2 = R2 * Ecoarse1
+    Ecoarse1 = R1 * Einitial
+    Ecoarse1_1 = jacobi_smooth(Acoarse1, Ecoarse1, rcoarse1, 1, 1, 1, 1, .1)
+    Ecoarse2 = R2 * Ecoarse1_1
     Ecoarse2_1 = jacobi_smooth(Acoarse2, Ecoarse2, rcoarse2, 1, 1, 1, 1, .1)
     Ecoarse3 = R3 * Ecoarse2_1
     Ecoarse3_1 = jacobi_smooth(Acoarse3, Ecoarse3, rcoarse3, 1, 1, 1, 1, .1)
@@ -250,4 +251,50 @@ function v_cycle(grid::Grid, A::SparseMatrixCSC, xcalc::Vector{Float64}, b::Vect
     xcalc = xcalc + Efine
 
     return xcalc # may want to return more depending on the information we want
+end
+
+function v_cycle_general(grids::Diffresgrids, A::SparseMatrixCSC, x::Vector{Float64}, b::Vector{Float64})
+    # doing a v-cycle in the formatting of the rest of the code (no restricted grids)
+
+    # loading the restriction/interpolation matrices into concise variables
+    R1 = grids.R1p
+    R2 = grids.R2p
+    R3 = grids.R3p
+    I1 = grids.I1p
+    I2 = grids.I2p
+    I3 = grids.I3p
+
+    # calculating the form of the matrix/residual at different resolutions
+    rcoarse1 = R1 * residual(A, x, b)
+    Acoarse1 = project_to_coarse(A, Nx, Ny, R1, I1)
+    x1 = R1 * x
+    b1 = R1 * b
+
+    rcoarse2 = R2 * residual(Acoarse1, x1, b1)
+    Acoarse2 = project_to_coarse(Acoarse1, Nx1, Ny1, R2, I2)
+    x2 = R2 * x1
+    b2 = R2 * b1
+
+    rcoarse3 = R3 * residual(Acoarse2, x2, b2)
+    Acoarse3 = project_to_coarse(Acoarse2, Nx2, Ny2, R3, I3)
+    x3 = R3 * x2
+    b3 = R3 * b2
+
+    # actual v-cycle steps
+    Einitial = zeros({Float64}, size(x))
+    Ecoarse1 = R1 * Einitial
+    Ecoarse1_1 = jacobi_smooth(Acoarse1, Ecoarse1, rcoarse1, 1, 1, 1, 1, .1)
+    Ecoarse2 = R2 * Ecoarse1_1
+    Ecoarse2_1 = jacobi_smooth(Acoarse2, Ecoarse2, rcoarse2, 1, 1, 1, 1, .1)
+    Ecoarse3 = R3 * Ecoarse2_1
+    Ecoarse3_1 = jacobi_smooth(Acoarse3, Ecoarse3, rcoarse3, 1, 1, 1, 1, .1)
+    Ecoarse2_2 = I3 * Ecoarse3_1
+    Ecoarse2_3 = jacobi_smooth(Acoarse2, Ecoarse2_2, rcoarse2, 1, 1, 1, 1, .1)
+    Ecoarse1_2 = I2 * Ecoarse2_3
+    Ecoarse1_3 = jacobi_smooth(Acoarse1, Ecoarse1_2, rcoarse1, 1, 1, 1, 1, .1)
+    Efine = I1 * Ecoarse1_3
+
+    x = x + Efine
+
+    return x
 end
