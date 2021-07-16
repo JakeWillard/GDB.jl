@@ -98,3 +98,18 @@ function smoothstep(x, y, delta, wall::Wall)
         return 1
     end
 end
+
+
+function inside(x, y, deltas::Vector{Float64}, walls::Vector{Wall})
+
+    is_inside = true
+
+    for l=1:length(walls)
+        if smoothstep(x, y, deltas[l], walls[l]) == 0
+            is_inside = false
+            break
+        end
+    end
+
+    return is_inside
+end
