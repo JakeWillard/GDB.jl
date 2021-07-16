@@ -13,9 +13,9 @@ function intergrid_transforms(Nx0, Ny0, P0, P1)
     Rc = kron(Ry, Rx)
     Ic = 4*transpose(Rc)
 
-    R = P0 * Rc * transpose(P1)
-    I = P1 * Ic * transpose(P0)
-    return R, I
+    Restr = P0 * Rc * transpose(P1)
+    Interp = P1 * Ic * transpose(P0)
+    return Restr, Interp
 end
 
 
@@ -136,7 +136,7 @@ function Grid(walls::Vector{Wall}, deltas::Vector{Float64}, corners::Matrix{Floa
         P0 = P1
         points, P1, nanmask, dx, dy = edge_trim_double(Nx, Ny, dx, dy, points, findnz[P0][2], deltas, walls)
         Restr, Interp = intergrid_transforms(Nx, Ny, P0, P1)
-        append!(restrictions, Restr)
+        prepend!(restrictions, Restr)
         append!(interpolations, Interp)
         Nx = Nx * 2
         Ny = Ny * 2
@@ -159,6 +159,7 @@ function Grid(walls::Vector{Wall}, deltas::Vector{Float64}, corners::Matrix{Floa
 
     return Grid(walls, deltas, corners, N_levels, [N0, N0], [m, m])
 end
+
 
 #
 # function Grid(walls::Vector{Wall}, deltas::Vector{Float64}, corners::Matrix{Float64}, N::Vector{Int}, m::Vector{Int})
