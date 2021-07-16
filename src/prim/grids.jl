@@ -6,6 +6,8 @@ struct Grid
     origin::Vector{Float64}
     projection::SparseMatrixCSC
     inverse_projection::SparseMatrixCSC
+    restrictions::Vector{SparseMatrixCSC}
+    interpolations::Vector{SparseMatrixCSC}
     nanmask::Matrix{Float64}
     mx::Int32
     my::Int32
@@ -155,6 +157,72 @@ function Grid(grd::Grid, walls::Array{Wall, 1}, deltas::Vector{Float64}, corners
 
     return Grid(grd, walls, deltas, corners, Int[n, n], Int[m, m])
 end
+
+
+
+# XXX: multigrid stuff
+
+
+function restriction1d(N)
+
+    R = zeros(Float64, (N, 2*N))
+    for i=1:N-1
+        R[i, 2*(i-1)+1:2*(i-1)+3] = Float64[1, 2, 1]
+    end
+    R[N,N-1:N] = Float64[2, 1]
+
+    return R / 4.0
+end
+
+
+function intergrid_transforms(crs_grd, fine_grd)
+
+    Rxc = restriction1d(crs_grd.Nx)
+    Ryc = restriction1d(crs_grd.Ny)
+    Rc = kron(Ryc, Rxc)
+    Ic = 4*transpose(Rc)
+
+    R = crs_grd.projection * Rc * fine_grd.inverse_projection
+    I = fine_grd.projection * Ic * crs_grd.inverse_projection
+
+    return R, I
+end
+
+
+function Grid(Nl::Int, walls::Vector{Wall}, deltas::Vector{Float64}, corners::Matrix{Float64}, N::Vector{Int}, m::Vector{Int})
+
+    Nx_crs, Ny_crs = N
+    grd_0 = Grid(walls, deltas, corners, N, m)
+    grd_1 = Grid(grd_0, walls, deltas, corners, 2, m)
+    R0, I0 = intergrid_transforms(grd_0, grd_1)
+
+    restrictions = SparseMatrixCSC[R0]
+    interpolations = SparseMatrixCSC[I0]
+    grds = Grid[grd_0, grd_1]
+
+    for l=2:Nl
+
+        grd_l = Grid(grds[l], walls, deltas, corners, 2, m)
+        Rl, Il = intergrid_transforms(grds[l], grd_l)
+
+    end
+
+    
+
+
+end
+
+
+
+
+
+
+
+
+
+
+
+# XXX
 
 
 
