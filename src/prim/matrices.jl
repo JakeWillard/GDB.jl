@@ -134,3 +134,24 @@ function galerkin_projection(A, grd)
 
     return MultiResMatrix(As)
 end
+
+
+function interp1d(N, m)
+
+    ic = Int(ceil(m/2.0))
+    Minv = stencil1d(m)
+    sten = transpose(Minv) * Float64[(1.5 - ic)^(j-1)/factorial(j-1) for j=1:m]
+
+    Ih = zeros(Float64, (N,N))
+    Is = I + Ih
+    for i=1:m
+        k = i - ic
+        vec = sten[i] * ones(N - abs(k))
+        Ih += diagm(k => vec)
+    end
+
+    Iout = zeros(Float64, (2*N,N))
+    Iout[1:2:end,:] = Is
+    Iout[2:2:end,:] = Ih
+    return Iout
+end
