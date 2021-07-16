@@ -9,6 +9,7 @@ function intergrid_transforms(Nx0, Ny0, P0, P1)
     end
     for i=1:Ny-1
         Ry[i, 2*(i-1)+1:2*(i-1)+3] = Float64[1, 2, 1] / 4.0
+    end
 
     Rc = kron(Ry, Rx)
     Ic = 4*transpose(Rc)
