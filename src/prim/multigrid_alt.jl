@@ -52,7 +52,7 @@ function setup_jacobi_smoothing(A::SparseMatrixCSC, w::Float64, grd::Grid)
 
     for a in A_mr.mats
         D = w*inv(Diagonal(a))
-        M = I - w*D*a
+        M = I - D*a
         append!(Ms, [M])
         append!(Ds, [D])
     end
@@ -69,18 +69,16 @@ function jacobi_smooth(n::Int64, M::MultiResMatrix, D::MultiResMatrix, r::Vector
     x = zeros(Float64, length(r))
     f = D * r
     for dummy=1:n
-        x = M * x + f
+        x[:] = M * x + f
     end
 
     return x
 end
 
 
-
 function residual(A::MultiResMatrix, x::Vector{Float64}, b::Vector{Float64})
     return b - A * x
 end
-
 
 
 function vcycle(A::MultiResMatrix, x0::Vector{Float64}, b::Vector{Float64}, M::MultiResMatrix, D::MultiResMatrix, n::Int64, grd::Grid)
@@ -106,6 +104,33 @@ function vcycle(A::MultiResMatrix, x0::Vector{Float64}, b::Vector{Float64}, M::M
 end
 
 
+function pure_jacobi(A0::SparseMatrixCSC, x0::Vector{Float64}, b::Vector{Float64}, w::Float64, grd::Grid)
+
+    # setup multiresolution matrices
+    A, M, D = setup_jacobi_smoothing(A0, w, grd)
+
+    # compute norm of b, initialize error
+    bnorm = norm(b)
+    err = 1.0
+    println()
+
+    r = residual(A, x0, b)
+
+    # interate until norm(residual) / bnorm < 10^-8
+    n_iters = 0
+    max_iters = 1000
+    while (err > 1e-8) && (n_iters < max_iters)
+        x = jacobi_smooth(100, M, D, r)
+        r = residual(A, x, r)
+        err = norm(r) / bnorm
+        n_iters += 1
+        println(err)
+    end
+
+    return x
+end
+
+
 function multigrid_solve(A0::SparseMatrixCSC, x::Vector{Float64}, b::Vector{Float64}, w::Float64, grd::Grid)
 
     # setup multiresolution matrices
@@ -117,9 +142,12 @@ function multigrid_solve(A0::SparseMatrixCSC, x::Vector{Float64}, b::Vector{Floa
     println()
 
     # interate until norm(residual) / bnorm < 10^-8
-    while err > 1e-8
-        x = vcycle(A, x, b, M, D, 100, grd)
+    n_iters = 0
+    max_iters = 100
+    while (err > 1e-8) && (n_iters < max_iters)
+        x = vcycle(A, x, b, M, D, 10, grd)
         err = norm(residual(A, x, b)) / bnorm
+        n_iters += 1
         println(err)
     end
 
