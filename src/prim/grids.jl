@@ -1,29 +1,61 @@
 
+function intergrid_1d_interp(N, m)
 
-function intergrid_transforms(Nx0, Ny0, P0, P1)
+    ic = Int(ceil(m/2.0))
+    Minv = stencil1d(m)
+    sten = transpose(Minv) * Float64[(0.5)^(j-1)/factorial(j-1) for j=1:m]
 
-    Rx = zeros(Float64, (Nx0, 2*Nx0))
-    Ry = zeros(Float64, (Ny0, 2*Ny0))
-    for i=1:Nx-1
-        Rx[i, 2*(i-1)+1:2*(i-1)+3] = Float64[1, 2, 1] / 4.0
+    Ih = zeros(Float64, (N,N))
+    Is = I + Ih
+    for i=1:m
+        k = i - ic
+        vec = sten[i] * ones(N - abs(k))
+        Ih += diagm(k => vec)
     end
-    for i=1:Ny-1
-        Ry[i, 2*(i-1)+1:2*(i-1)+3] = Float64[1, 2, 1] / 4.0
-    end
 
-    Rc = kron(Ry, Rx)
-    Ic = 4*transpose(Rc)
+    Iout = zeros(Float64, (2*N,N))
+    Iout[1:2:end,:] = Is
+    Iout[2:2:end,:] = Ih
+    return Iout
+end
+
+
+function intergrid_transforms(Nx0, Ny0, mx, my, P0, P1)
+
+    Ix = intergrid_1d_interp(Nx0, mx)
+    Iy = intergrid_1d_interp(Ny0, my)
+    Ic = kron(sparse(Iy), sparse(Ix))
+    Rc = transpose(Ic) / 4.0
 
     Restr = P0 * Rc * transpose(P1)
     Interp = P1 * Ic * transpose(P0)
     return Restr, Interp
 end
 
+# function intergrid_transforms(Nx0, Ny0, P0, P1)
+#
+#     Rx = zeros(Float64, (Nx0, 2*Nx0))
+#     Ry = zeros(Float64, (Ny0, 2*Ny0))
+#     for i=1:Nx-1
+#         Rx[i, 2*(i-1)+1:2*(i-1)+3] = Float64[1, 2, 1] / 4.0
+#     end
+#     for i=1:Ny-1
+#         Ry[i, 2*(i-1)+1:2*(i-1)+3] = Float64[1, 2, 1] / 4.0
+#     end
+#
+#     Rc = kron(Ry, Rx)
+#     Ic = 4*transpose(Rc)
+#
+#     Restr = P0 * Rc * transpose(P1)
+#     Interp = P1 * Ic * transpose(P0)
+#     return Restr, Interp
+# end
 
-function edge_trim_box(walls::Vector{Wall}, deltas::Vector{Float64}, Nx::Int32, Ny::Int32, bottom_left::Vector{Float64}, bottom_right::Vector{Float64})
 
-    deltaX = bottom_right[1] - bottom_left[1]
-    deltaY = bottom_right[2] - bottom_left[2]
+function edge_trim_box(walls::Vector{Wall}, deltas::Vector{Float64}, Nx::Int32, Ny::Int32, bottom_left::Vector{Float64}, top_right::Vector{Float64})
+
+    deltaX = top_right[1] - bottom_left[1]
+    deltaY = top_right[2] - bottom_left[2]
     dx = deltaX / Nx
     dy = deltaY / Ny
 
