@@ -5,8 +5,8 @@
 struct MultiResMatrix
 
     mats :: Array{SparseMatrixCSC{Float64, Int32}, 1}
-    lvl_by_row_size :: Dict{Int32, Int32}
-    lvl_by_column_size :: Dict{Int32, Int32}
+    lvl_by_row_size :: Dict{Int64, Int64}
+    lvl_by_column_size :: Dict{Int64, Int64}
 
 end
 
@@ -14,30 +14,30 @@ end
 # function so that multiplying from the left or the right automatically works. Both M*X and X*M will multiply
 # X by the correct version of M.
 function Base.:*(A::MultiResMatrix, X)
-    lvl = lvl_by_row_size[size(X)[1]]
+    lvl = A.lvl_by_row_size[size(X)[1]]
     return A.mats[lvl] * X
 end
 function Base.:*(X, A::MultiResMatrix)
-    lvl = lvl_by_column_size[size(X)[2]]
+    lvl = A.lvl_by_column_size[size(X)[2]]
     return X * A.mats[lvl]
 end
 
 
 function MultiResMatrix(A::SparseMatrixCSC, grd::Grid)
 
-    As = [A]
-    lvl_by_row_size = Dict{size(A)[2] => 1}
-    lvl_by_column_size = Dict{size(A)[1] => 1}
+    As = SparseMatrixCSC[A]
+    lvl_by_row_size = Dict(size(A)[2] => 1)
+    lvl_by_column_size = Dict(size(A)[1] => 1)
 
 
     for l=1:length(grd.restrictions)
         Restr = grd.restrictions[l]
         Interp = grd.interpolations[end-(l-1)]
         Ap = Restr * As[end] * Interp
-        append!(As, Ap)
+        append!(As, [Ap])
 
         lvl_by_row_size[size(Ap)[2]] = l+1
-        lvl_by_column_size[size(Ap[1])] = l+1
+        lvl_by_column_size[size(Ap)[1]] = l+1
     end
 
     return MultiResMatrix(As, lvl_by_row_size, lvl_by_column_size)
@@ -51,10 +51,10 @@ function setup_jacobi_smoothing(A::SparseMatrixCSC, w::Float64, grd::Grid)
     Ds = SparseMatrixCSC[]
 
     for a in A_mr.mats
-        D = inv(Diagonal(a))
+        D = w*inv(Diagonal(a))
         M = I - w*D*a
-        append!(Ms, M)
-        append!(Ds, D)
+        append!(Ms, [M])
+        append!(Ds, [D])
     end
 
     M_mr = MultiResMatrix(Ms, A_mr.lvl_by_row_size, A_mr.lvl_by_column_size)
@@ -64,7 +64,7 @@ function setup_jacobi_smoothing(A::SparseMatrixCSC, w::Float64, grd::Grid)
 end
 
 
-function jacobi_smooth(n::Int32, M::MultiResMatrix, D::MultiResMatrix, r::Vector{Float64}
+function jacobi_smooth(n::Int64, M::MultiResMatrix, D::MultiResMatrix, r::Vector{Float64})
 
     x = zeros(Float64, length(r))
     f = D * r
@@ -83,7 +83,7 @@ end
 
 
 
-function vcycle(A::MultiResMatrix, x0::Vector{Float64}, b::Vector{Float64}, M::MultiResMatrix, D::MultiResMatrix, n::Int32, grd::Grid)
+function vcycle(A::MultiResMatrix, x0::Vector{Float64}, b::Vector{Float64}, M::MultiResMatrix, D::MultiResMatrix, n::Int64, grd::Grid)
 
     # compute initial residual
     r = residual(A, x0, b)
@@ -109,16 +109,18 @@ end
 function multigrid_solve(A0::SparseMatrixCSC, x::Vector{Float64}, b::Vector{Float64}, w::Float64, grd::Grid)
 
     # setup multiresolution matrices
-    A, M, D = setup_jacobi(A0, w, grd)
+    A, M, D = setup_jacobi_smoothing(A0, w, grd)
 
     # compute norm of b, initialize error
     bnorm = norm(b)
     err = 1.0
+    println()
 
     # interate until norm(residual) / bnorm < 10^-8
-    while err < 1e-8
-        x = vcycle(A, x, b, M, D, 10, grd)
+    while err > 1e-8
+        x = vcycle(A, x, b, M, D, 100, grd)
         err = norm(residual(A, x, b)) / bnorm
+        println(err)
     end
 
     return x
