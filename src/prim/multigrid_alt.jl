@@ -1,53 +1,125 @@
 
-mutable struct MultiResMatrix <: AbstractMatrix{Float64}
+# the idea behind this struct is that instances represent a matrix at multiple resolutions. Not only
+# can the same matrix at different resolutions be represented by the same variable, but the algebra can be
+# simplified in a more elegant way too.
+struct MultiResMatrix
 
     mats :: Array{SparseMatrixCSC{Float64, Int32}, 1}
-    lvl :: Int32
+    lvl_by_row_size :: Dict{Int32, Int32}
+    lvl_by_column_size :: Dict{Int32, Int32}
 
-    MultiResMatrix(mats) = MultiResMatrix(mats, 1)
-    Base.size(m::MultiResMatrix) = Base.size(m.mats[m.level])
-    Base.getindex(m::MultiResMatrix, inds...) = Base.getindex(m.mats[m.level], inds...)
-    Base.setindex!(m::MultiResMatrix, X, inds...) = Base.setindex!(m.mats[m.level], X, inds...)
-    uplvl!(m::MultiResMatrix) = begin m.lvl += 1 end
-    dwnlvl!(m::MultiResMatrix) = begin m.lvl -= 1 end
+end
+
+# no need for Julia to see this struct as a custom array, but we can overload the multiplication
+# function so that multiplying from the left or the right automatically works. Both M*X and X*M will multiply
+# X by the correct version of M.
+function Base.:*(A::MultiResMatrix, X)
+    lvl = lvl_by_row_size[size(X)[1]]
+    return A.mats[lvl] * X
+end
+function Base.:*(X, A::MultiResMatrix)
+    lvl = lvl_by_column_size[size(X)[2]]
+    return X * A.mats[lvl]
 end
 
 
 function MultiResMatrix(A::SparseMatrixCSC, grd::Grid)
 
     As = [A]
+    lvl_by_row_size = Dict{size(A)[2] => 1}
+    lvl_by_column_size = Dict{size(A)[1] => 1}
+
+
     for l=1:length(grd.restrictions)
         Restr = grd.restrictions[l]
         Interp = grd.interpolations[end-(l-1)]
-        append!(As, Restr * As[end] * Interp)
+        Ap = Restr * As[end] * Interp
+        append!(As, Ap)
+
+        lvl_by_row_size[size(Ap)[2]] = l+1
+        lvl_by_column_size[size(Ap[1])] = l+1
     end
 
-    return MultiResMatrix(As)
+    return MultiResMatrix(As, lvl_by_row_size, lvl_by_column_size)
 end
 
 
-function MultiResMatrix(f::Function, A::SparseMatrixCSC, grd::Grid)
+function setup_jacobi_smoothing(A::SparseMatrixCSC, w::Float64, grd::Grid)
 
-    Fs = [f(A)]
-    for l=1:length(grd.restrictions)
-        Restr = grd.restrictions[l]
-        Interp = grd.interpolations[end-(l-1)]
-        append!(Fs, f(Restr * As[end] * Interp))
+    A_mr = MultiResMatrix(A, grd)
+    Ms = SparseMatrixCSC[]
+    Ds = SparseMatrixCSC[]
+
+    for a in A_mr.mats
+        D = inv(Diagonal(a))
+        M = I - w*D*a
+        append!(Ms, M)
+        append!(Ds, D)
     end
 
-    return MultiResMatrix(Fs)
+    M_mr = MultiResMatrix(Ms, A_mr.lvl_by_row_size, A_mr.lvl_by_column_size)
+    D_mr = MultiResMatrix(Ds, A_mr.lvl_by_row_size, A_mr.lvl_by_column_size)
+
+    return A_mr, M_mr, D_mr
 end
 
 
-function multires_jacobi_smoother(A::SparseMatrixCSC, grd::Grid, w::Float64)
+function jacobi_smooth(n::Int32, M::MultiResMatrix, D::MultiResMatrix, r::Vector{Float64}
 
-    f(X) = I - w*inv(Diagonal(X)) * X
-    g(X) = inv(Diagonal(X))
+    x = zeros(Float64, length(r))
+    f = D * r
+    for dummy=1:n
+        x = M * x + f
+    end
 
-    M = MultiResMatrix(f, A, grd)
-    Dinv = MultiResMatrix(g, A, grd)
-    return M, Dinv
+    return x
 end
 
 
-function jacobi_vcycle(M::MultiResMatrix, Dinv::MultiResMatrix, )
+
+function residual(A::MultiResMatrix, x::Vector{Float64}, b::Vector{Float64})
+    return b - A * x
+end
+
+
+
+function vcycle(A::MultiResMatrix, x0::Vector{Float64}, b::Vector{Float64}, M::MultiResMatrix, D::MultiResMatrix, n::Int32, grd::Grid)
+
+    # compute initial residual
+    r = residual(A, x0, b)
+
+    # relax on coarser grids
+    for Restr in grd.restrictions
+        x = jacobi_smooth(n, M, D, r)
+        r = Restr*residual(A, x, r)
+    end
+
+    # relax on finer grids
+    for Interp in grd.interpolations
+        x = jacobi_smooth(n, M, D, r)
+        r = Interp*residual(A, x, r)
+    end
+
+    # final smoothing
+    x = jacobi_smooth(n, M, D, r)
+    return x0 + x
+end
+
+
+function multigrid_solve(A0::SparseMatrixCSC, x::Vector{Float64}, b::Vector{Float64}, w::Float64, grd::Grid)
+
+    # setup multiresolution matrices
+    A, M, D = setup_jacobi(A0, w, grd)
+
+    # compute norm of b, initialize error
+    bnorm = norm(b)
+    err = 1.0
+
+    # interate until norm(residual) / bnorm < 10^-8
+    while err < 1e-8
+        x = vcycle(A, x, b, M, D, 10, grd)
+        err = norm(residual(A, x, b)) / bnorm
+    end
+
+    return x
+end
