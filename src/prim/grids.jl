@@ -66,7 +66,7 @@ function edge_trim_box(walls::Vector{Wall}, deltas::Vector{Float64}, Nx::Int64, 
 end
 
 
-function edge_trim_double(Nx0::Int64, Ny0::Int64, dx0::Float64, dy0::Float64, points0::Matrix{Float64}, proj_cols0::Vector{Int32}, deltas::Vector{Float64}, walls::Vector{Wall})
+function edge_trim_double(points0::Matrix{Float64}, walls::Vector{Wall}, deltas::Vector{Float64}, dx0::Float64, dy0::Float64, Nx0::Int64, Ny0::Int64, bottom_left::Vector{Float64})
 
     dx = dx0 / 2.0
     dy = dy0 / 2.0
@@ -84,17 +84,16 @@ function edge_trim_double(Nx0::Int64, Ny0::Int64, dx0::Float64, dy0::Float64, po
             for i=1:2
                 x = points0[1,l] + (i-1)*dx
                 y = points0[2,l] + (j-1)*dy
-
-                i0 = rem(proj_cols0[l], Nx0)
-                j0 = div(proj_cols0[l], Ny0)
-                i2 = (i0-1)*2 + i
-                j2 = (j0-1)*2 + j
+                deltaX = x - bottom_left[1]
+                deltaY = y - bottom_left[2]
+                ic = Int(round(deltaX/dx))
+                jc = Int(round(deltaY/dy))
 
                 if inside(x, y, deltas, walls)
                     Nk += 1
                     points[:,Nk] = [x, y]
-                    proj_cols[Nk] = i2 + 2*Nx0*(j2-1)
-                    nanmask[i2, j2] = 1.0
+                    proj_cols[Nk] = ic + 2*Nx0*(jc-1)
+                    nanmask[ic, jc] = 1.0
                 end
 
             end
@@ -104,6 +103,53 @@ function edge_trim_double(Nx0::Int64, Ny0::Int64, dx0::Float64, dy0::Float64, po
     P = sparse(proj_rows[1:Nk], proj_cols[1:Nk], proj_vals[1:Nk], Nk, 4*Nx0*Ny0)
     return points[:,1:Nk], P, nanmask, dx, dy
 end
+
+
+
+#
+#
+#
+#
+#
+#
+# function edge_trim_double(Nx0::Int64, Ny0::Int64, dx0::Float64, dy0::Float64, points0::Matrix{Float64}, proj_cols0::Vector{Int32}, deltas::Vector{Float64}, walls::Vector{Wall})
+#
+#     dx = dx0 / 2.0
+#     dy = dy0 / 2.0
+#     Nk0 = size(points0)[2]
+#
+#     points = zeros(Float64, (2, 4*Nk0))
+#     proj_rows = Int32[i for i=1:4*Nk0]
+#     proj_cols = zeros(Int32, 4*Nk0)
+#     proj_vals = ones(Int32, 4*Nk0)
+#     nanmask = fill(NaN, (2*Nx0, 2*Ny0))
+#     Nk = 0
+#
+#     for l=1:Nk0
+#         for j=1:2
+#             for i=1:2
+#                 x = points0[1,l] + (i-1)*dx
+#                 y = points0[2,l] + (j-1)*dy
+#
+#                 i0 = rem(proj_cols0[l], Nx0)
+#                 j0 = div(proj_cols0[l], Ny0)
+#                 i2 = (i0-1)*2 + i
+#                 j2 = (j0-1)*2 + j
+#
+#                 if inside(x, y, deltas, walls)
+#                     Nk += 1
+#                     points[:,Nk] = [x, y]
+#                     proj_cols[Nk] = i2 + 2*Nx0*(j2-1)
+#                     nanmask[i2, j2] = 1.0
+#                 end
+#
+#             end
+#         end
+#     end
+#
+#     P = sparse(proj_rows[1:Nk], proj_cols[1:Nk], proj_vals[1:Nk], Nk, 4*Nx0*Ny0)
+#     return points[:,1:Nk], P, nanmask, dx, dy
+# end
 
 
 
@@ -129,7 +175,6 @@ struct Grid
 
 end
 
-
 function Grid(walls::Vector{Wall}, deltas::Vector{Float64}, corners::Matrix{Float64}, N_levels::Int64, N0::Vector{Int}, m::Vector{Int})
 
     Nx, Ny = N0
@@ -137,7 +182,7 @@ function Grid(walls::Vector{Wall}, deltas::Vector{Float64}, corners::Matrix{Floa
 
     # trim the bounding box, then double the resolutions and compute Restr and Interp
     points, P0, nanmask, dx, dy = edge_trim_box(walls, deltas, Nx, Ny, corners[:,1], corners[:,2])
-    points, P1, nanmask, dx, dy = edge_trim_double(Nx, Ny, dx, dy, points, findnz(P0)[2], deltas/2, walls)
+    points, P1, nanmask, dx, dy = edge_trim_double(points, walls, deltas/2, dx, dy, Nx, Ny, corners[:,1])
     Restr, Interp = intergrid_transforms(Nx, Ny, mx+1, my+1, P0, P1)
     Nx = Nx * 2
     Ny = Ny * 2
@@ -148,7 +193,7 @@ function Grid(walls::Vector{Wall}, deltas::Vector{Float64}, corners::Matrix{Floa
     for l=3:N_levels
 
         P0 = P1
-        points, P1, nanmask, dx, dy = edge_trim_double(Nx, Ny, dx, dy, points, findnz(P0)[2], deltas/l, walls)
+        points, P1, nanmask, dx, dy = edge_trim_double(points, walls, deltas/l, dx, dy, Nx, Ny, corners[:,1])
         Restr, Interp = intergrid_transforms(Nx, Ny, mx+1, my+1, P0, P1)
         prepend!(restrictions, [Restr])
         append!(interpolations, [Interp])
