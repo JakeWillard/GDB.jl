@@ -1,4 +1,111 @@
 
+function intergrid_1d_interp(N, m)
+
+    ic = Int(ceil(m/2.0))
+    Minv = stencil1d(m)
+    sten = transpose(Minv) * Float64[(0.5)^(j-1)/factorial(j-1) for j=1:m]
+
+    Ih = zeros(Float64, (N,N))
+    Is = I + Ih
+    for i=1:m
+        k = i - ic
+        vec = sten[i] * ones(N - abs(k))
+        Ih += diagm(k => vec)
+    end
+
+    Iout = zeros(Float64, (2*N,N))
+    Iout[1:2:end,:] = Is
+    Iout[2:2:end,:] = Ih
+    return Iout
+end
+
+
+function intergrid_transforms(Nx0, Ny0, mx, my, P0, P1)
+
+    Ix = intergrid_1d_interp(Nx0, mx)
+    Iy = intergrid_1d_interp(Ny0, my)
+    Ic = kron(sparse(Iy), sparse(Ix))
+    Rc = transpose(Ic) / 4.0
+
+    Restr = P0 * Rc * transpose(P1)
+    Interp = P1 * Ic * transpose(P0)
+    return Restr, Interp
+end
+
+
+function edge_trim_box(walls::Vector{Wall}, deltas::Vector{Float64}, Nx::Int64, Ny::Int64, bottom_left::Vector{Float64}, top_right::Vector{Float64})
+
+    deltaX = top_right[1] - bottom_left[1]
+    deltaY = top_right[2] - bottom_left[2]
+    dx = deltaX / Nx
+    dy = deltaY / Ny
+
+    points = zeros(Float64, (2, Nx*Ny))
+    proj_rows = Int32[i for i=1:Nx*Ny]
+    proj_cols = zeros(Int32, Nx*Ny)
+    proj_vals = ones(Int32, Nx*Ny)
+    nanmask = fill(NaN, (Nx, Ny))
+    Nk = 0
+
+    for j=1:Ny
+        for i=1:Nx
+
+            x = bottom_left[1] + (i-1)*dx
+            y = bottom_left[2] + (j-1)*dx
+            if inside(x, y, deltas, walls)
+                Nk += 1
+                points[:,Nk] = [x, y]
+                proj_cols[Nk] = i + Nx*(j-1)
+                nanmask[i,j] = 1.0
+            end
+        end
+    end
+
+    P = sparse(proj_rows[1:Nk], proj_cols[1:Nk], proj_vals[1:Nk], Nk, Nx*Ny)
+    return points[:,1:Nk], P, nanmask, dx, dy
+end
+
+
+function edge_trim_double(Nx0::Int64, Ny0::Int64, dx0::Float64, dy0::Float64, points0::Matrix{Float64}, proj_cols0::Vector{Int32}, deltas::Vector{Float64}, walls::Vector{Wall})
+
+    dx = dx0 / 2.0
+    dy = dy0 / 2.0
+    Nk0 = size(points0)[2]
+
+    points = zeros(Float64, (2, 4*Nk0))
+    proj_rows = Int32[i for i=1:4*Nk0]
+    proj_cols = zeros(Int32, 4*Nk0)
+    proj_vals = ones(Int32, 4*Nk0)
+    nanmask = fill(NaN, (2*Nx0, 2*Ny0))
+    Nk = 0
+
+    for l=1:Nk0
+        for j=1:2
+            for i=1:2
+                x = points0[1,l] + (i-1)*dx
+                y = points0[2,l] + (j-1)*dy
+
+                i0 = rem(proj_cols0[l], Nx0)
+                j0 = div(proj_cols0[l], Ny0)
+                i2 = (i0-1)*2 + i
+                j2 = (j0-1)*2 + j
+
+                if inside(x, y, deltas, walls)
+                    Nk += 1
+                    points[:,Nk] = [x, y]
+                    proj_cols[Nk] = i2 + 2*Nx0*(j2-1)
+                    nanmask[i2, j2] = 1.0
+                end
+
+            end
+        end
+    end
+
+    P = sparse(proj_rows[1:Nk], proj_cols[1:Nk], proj_vals[1:Nk], Nk, 4*Nx0*Ny0)
+    return points[:,1:Nk], P, nanmask, dx, dy
+end
+
+
 
 struct Grid
 
@@ -23,207 +130,49 @@ struct Grid
 end
 
 
-function Grid(walls::Vector{Wall}, deltas::Vector{Float64}, corners::Matrix{Float64}, N::Vector{Int}, m::Vector{Int})
+function Grid(walls::Vector{Wall}, deltas::Vector{Float64}, corners::Matrix{Float64}, N_levels::Int64, N0::Vector{Int}, m::Vector{Int})
 
-    Nx, Ny = N
-    Nxy = Nx*Ny
-    points = zeros(Float64, (2, Nxy))
+    Nx, Ny = N0
+    mx, my = m
 
-    # c1 is bottom left corner of bounding box, c2 is top right
-    c1 = corners[:,1]
-    c2 = corners[:,2]
-    dx = (c2[1] - c1[1]) / Nx
-    dy = (c2[2] - c1[2]) / Ny
-    Nk = 0
+    # trim the bounding box, then double the resolutions and compute Restr and Interp
+    points, P0, nanmask, dx, dy = edge_trim_box(walls, deltas, Nx, Ny, corners[:,1], corners[:,2])
+    points, P1, nanmask, dx, dy = edge_trim_double(Nx, Ny, dx, dy, points, findnz(P0)[2], deltas/2, walls)
+    Restr, Interp = intergrid_transforms(Nx, Ny, mx+1, my+1, P0, P1)
+    Nx = Nx * 2
+    Ny = Ny * 2
 
-    proj_rows = Int32[i for i=1:Nxy]
-    proj_cols = zeros(Int32, Nxy)
-    proj_vals = ones(Int32, Nxy)
+    restrictions = SparseMatrixCSC[Restr]
+    interpolations = SparseMatrixCSC[Interp]
 
-    nanmask = fill(NaN, (Nx, Ny))
+    for l=3:N_levels
 
-    for j=1:Ny
-        for i=1:Nx
-            x = c1[1] + (i-1) * dx
-            y = c1[2] + (j-1) * dy
-            inside = true
-
-            for l=1:length(walls)
-                if smoothstep(x, y, deltas[l], walls[l]) == 0
-                    inside = false
-                    break
-                end
-            end
-
-            if inside
-                Nk += 1
-                points[:,Nk] = [x, y]
-                proj_cols[Nk] = i + Nx*(j-1)
-                nanmask[i,j] = 1.0
-            end
-
-        end
+        P0 = P1
+        points, P1, nanmask, dx, dy = edge_trim_double(Nx, Ny, dx, dy, points, findnz(P0)[2], deltas/l, walls)
+        Restr, Interp = intergrid_transforms(Nx, Ny, mx+1, my+1, P0, P1)
+        prepend!(restrictions, [Restr])
+        append!(interpolations, [Interp])
+        Nx = Nx * 2
+        Ny = Ny * 2
     end
 
-    P = sparse(proj_rows[1:Nk], proj_cols[1:Nk], proj_vals[1:Nk], Nk, Nxy)
-    Pinv = transpose(P)
-
-    # compute stencils
-    mx, my = m
+    origin = corners[:,1]
+    projection = P1
+    inverse_projection = transpose(P1)
+    Nk = size(points)[2]
     Mxinv = stencil1d(mx)
     Myinv = stencil1d(my)
     MxyinvT = stencil2d(mx, my)
 
-    return Grid(points[:,1:Nk], c1, P, Pinv, nanmask, mx, my, Nx, Ny, Nk, Mxinv, Myinv, MxyinvT, dx, dy)
+    return Grid(points, origin, projection, inverse_projection, restrictions, interpolations,
+                nanmask, mx, my, Nx, Ny, Nk, Mxinv, Myinv, MxyinvT, dx, dy)
 end
 
 
-function Grid(grd::Grid, walls::Vector{Wall}, deltas::Vector{Float64}, corners::Matrix{Float64}, n::Vector{Int}, m::Vector{Int})
+function Grid(walls::Vector{Wall}, deltas::Vector{Float64}, corners::Matrix{Float64}, N_levels::Int64, N0::Int64, m::Int64)
 
-    nx, ny = n
-    Nxy = nx*ny*grd.Nk
-    points = zeros(Float64, (2, Nxy))
-
-    c1 = corners[:,1]
-    c2 = corners[:,2]
-    dx = grd.dx / nx
-    dy = grd.dy / ny
-    Nk = 0
-
-    # get nonzero rows from coarse projection matrix
-    dummy, J, dummmy = findnz(grd.projection)
-
-    proj_rows = Int32[i for i=1:Nxy]
-    proj_cols = zeros(Int32, Nxy)
-    proj_vals = ones(Int32, Nxy)
-
-    # nanmask is useful for data visualization, represent points outside the
-    # domain with NaN
-    nanmask = fill(NaN, (nx*grd.Nx, ny*grd.Ny))
-
-    for k=1:grd.Nk
-        for j=1:ny
-            for i=1:nx
-                x = grd.points[1,k] + (i-1) * dx
-                y = grd.points[2,k] + (j-1) * dx
-
-                # compute (i,j) coordinates on coarse grid
-                crs_i = rem(J[k], grd.Ny)
-                crs_j = div(J[k], grd.Ny)
-
-                # compute (i,j) coordinates on fine grid
-                fn_i = (crs_i-1)*nx + i
-                fn_j = (crs_j-1)*ny + j
-
-                inside = true
-                for l=1:length(walls)
-                    if smoothstep(x, y, deltas[l], walls[l]) == 0
-                        inside = false
-                        break
-                    end
-                end
-
-                if inside
-                    Nk += 1
-                    points[:,Nk] = [x, y]
-                    proj_cols[Nk] = fn_i + nx*grd.Nx*(fn_j-1)
-                    nanmask[fn_i, fn_j] = 1.0
-                end
-
-            end
-        end
-    end
-
-    P = sparse(proj_rows[1:Nk], proj_cols[1:Nk], proj_vals[1:Nk], Nk, nx*ny*grd.Nx*grd.Ny)
-    Pinv = transpose(P)
-
-    # compute stencils
-    mx, my = m
-    Mxinv = stencil1d(mx)
-    Myinv = stencil1d(my)
-    MxyinvT = stencil2d(mx, my)
-
-    return Grid(points[:,1:Nk], c1, P, Pinv, nanmask, mx, my, nx*grd.Nx, ny*grd.Ny, Nk, Mxinv, Myinv, MxyinvT, dx, dy)
+    return Grid(walls, deltas, corners, N_levels, [N0, N0], [m, m])
 end
-
-
-function Grid(walls::Array{Wall, 1}, deltas::Vector{Float64}, corners::Matrix{Float64}, N::Int, m::Int)
-
-    return Grid(walls, deltas, corners, Int[N, N], Int[m, m])
-end
-
-
-function Grid(grd::Grid, walls::Array{Wall, 1}, deltas::Vector{Float64}, corners::Matrix{Float64}, n::Int, m::Int)
-
-    return Grid(grd, walls, deltas, corners, Int[n, n], Int[m, m])
-end
-
-
-
-# XXX: multigrid stuff
-
-
-function restriction1d(N)
-
-    R = zeros(Float64, (N, 2*N))
-    for i=1:N-1
-        R[i, 2*(i-1)+1:2*(i-1)+3] = Float64[1, 2, 1]
-    end
-    R[N,N-1:N] = Float64[2, 1]
-
-    return R / 4.0
-end
-
-
-function intergrid_transforms(crs_grd, fine_grd)
-
-    Rxc = restriction1d(crs_grd.Nx)
-    Ryc = restriction1d(crs_grd.Ny)
-    Rc = kron(Ryc, Rxc)
-    Ic = 4*transpose(Rc)
-
-    R = crs_grd.projection * Rc * fine_grd.inverse_projection
-    I = fine_grd.projection * Ic * crs_grd.inverse_projection
-
-    return R, I
-end
-
-
-function Grid(Nl::Int, walls::Vector{Wall}, deltas::Vector{Float64}, corners::Matrix{Float64}, N::Vector{Int}, m::Vector{Int})
-
-    Nx_crs, Ny_crs = N
-    grd_0 = Grid(walls, deltas, corners, N, m)
-    grd_1 = Grid(grd_0, walls, deltas, corners, 2, m)
-    R0, I0 = intergrid_transforms(grd_0, grd_1)
-
-    restrictions = SparseMatrixCSC[R0]
-    interpolations = SparseMatrixCSC[I0]
-    grds = Grid[grd_0, grd_1]
-
-    for l=2:Nl
-
-        grd_l = Grid(grds[l], walls, deltas, corners, 2, m)
-        Rl, Il = intergrid_transforms(grds[l], grd_l)
-
-    end
-
-    
-
-
-end
-
-
-
-
-
-
-
-
-
-
-
-# XXX
-
 
 
 function vec_to_mesh(vec, grid::Grid)
