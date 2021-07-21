@@ -84,18 +84,22 @@ end
 function vcycle(A::MultiResMatrix, x0::Vector{Float64}, b::Vector{Float64}, M::MultiResMatrix, D::MultiResMatrix, n::Int64, grd::Grid)
 
     # compute initial residual
-    r = residual(A, x0, b)
+    r = b - A*x0
 
     # relax on coarser grids
     for Restr in grd.restrictions
         x = jacobi_smooth(n, M, D, zeros(Float64, length(r)), r)
-        r = Restr*residual(A, x, r) #XXX is this correct? same mistake as before?
+        r = Restr*(r - A*x)
     end
 
+    # solve exactly on course grid, then interpolate
+    x_crs = grd.interpolations[1] * (A.mats[end] \ r)
+    r = grd.interpolations[1]*r - A * (x + x_crs)
+
     # relax on finer grids
-    for Interp in grd.interpolations
+    for Interp in grd.interpolations[2:end]
         x = jacobi_smooth(n, M, D, zeros(Float64, length(r)), r)
-        r = Interp*residual(A, x, r)
+        r = Interp*(r - A*x)
     end
 
     # final smoothing
@@ -112,6 +116,7 @@ function pure_jacobi(A0::SparseMatrixCSC, x0::Vector{Float64}, b::Vector{Float64
     # compute norm of b, initialize error
     bnorm = norm(b)
     err = 1.0
+    x = x0[:]
     println()
 
     # interate until norm(residual) / bnorm < 10^-8
@@ -141,9 +146,9 @@ function multigrid_solve(A0::SparseMatrixCSC, x::Vector{Float64}, b::Vector{Floa
 
     # interate until norm(residual) / bnorm < 10^-8
     n_iters = 0
-    max_iters = Inf
+    max_iters = 1000
     while (err > 1e-8) && (n_iters < max_iters)
-        x = vcycle(A, x, b, M, D, 10, grd)
+        x = vcycle(A, x, b, M, D, 100, grd)
         err = norm(residual(A, x, b)) / bnorm
         n_iters += 1
         println(err)
