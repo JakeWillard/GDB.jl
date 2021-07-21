@@ -107,3 +107,36 @@ function penalization_matrix(delta, wall::Wall, grd::Grid)
 
     return Diagonal(f_to_grid((x,y) -> smoothstep(x,y,delta,wall), grd))
 end
+
+
+function fieldline_forward_map(bx::Function, by::Function, bz::Function, ds::Float64, Nz::Int64, grd::Grid)
+
+    deltaPhi = 2*pi / Nz
+    dS = zeros(Float64, grd.Nk)
+    points = zeros(Float64, (2, grd.Nk))
+    for k=1:grd.Nk
+        x0, y0 = grd.points[:,k]
+        x, y, deltaS = trace_fieldline(x0, y0, bx, by, bz, ds, deltaPhi)
+        dS[k] = deltaS
+        points[:,k] = [x,y]
+    end
+
+    return interpolation_matrix(points, grd), dS
+end
+
+
+# NOTE: this is a copy of fieldline_forward_map but the sign of ds is flipped.
+function fieldline_backward_map(bx::Function, by::Function, bz::Function, ds::Float64, Nz::Int64, grd::Grid)
+
+    deltaPhi = 2*pi / Nz
+    dS = zeros(Float64, grd.Nk)
+    points = zeros(Float64, (2, grd.Nk))
+    for k=1:grd.Nk
+        x0, y0 = grd.points[:,k]
+        x, y, deltaS = trace_fieldline(x0, y0, bx, by, bz, -ds, deltaPhi)
+        dS[k] = deltaS
+        points[:,k] = [x,y]
+    end
+
+    return interpolation_matrix(points, grd), dS
+end
