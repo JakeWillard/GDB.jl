@@ -1,7 +1,7 @@
 
 
 # NOTE: this is mostly just copied from wikipedia
-function gmres(A::SparseMatrixCSC, x0::Vector{Float64}, b::Vector{Float64}, m::Int64; err_thresh = 1e-20)
+function gmres_cycle(A::SparseMatrixCSC, x0::Vector{Float64}, b::Vector{Float64}, m::Int64; err_thresh = 1e-20)
 
     # compute initial residual, norm(b) and initial error
     r = b - A * x0
@@ -64,4 +64,17 @@ function gmres(A::SparseMatrixCSC, x0::Vector{Float64}, b::Vector{Float64}, m::I
     y = H[1:nk,1:nk] \ beta[1:nk]
     x = x0 + Q[:,1:nk] * y
     return x, err
+end
+
+
+function gmres_solve(A::SparseMatrixCSC, x0::Vector{Float64}, b::Vector{Float64}, m::Int64; err_thresh = 1e-20)
+
+    x = x0[:]
+    err = 1.0
+
+    while err > err_thresh
+        x, err = gmres_cycle(A, x, b, m, err_thresh=err_thresh)
+    end
+
+    return x
 end
