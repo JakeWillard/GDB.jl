@@ -11,7 +11,7 @@ function transformation_matrices(Nx::Int32, Ny::Int32)
     # could do a while loop potentially, if trying to get under a threshold
 
     # define the interpolation matrix, then the restriction matrix as its transpose
-    
+
     # only working in 1D so far
     Interpx = zeros(Nx, coarsexres)
     # Restrx1D = zeros(coarsexres, Nx)
@@ -29,7 +29,7 @@ function transformation_matrices(Nx::Int32, Ny::Int32)
     end
 
     Restrx1D = .5*transpose(Interpx) # definition of restriction matrix from the paper
-    
+
 
     # moving to 2D?
     # defining values based on 2D interpolation scheme in the paper
@@ -66,14 +66,14 @@ function fine_to_coarse(Nx::Int32, Ny::Int32, x::Vector{Float64}, y::Vector{Floa
     Restriction, Interpolation, newxres, newyres = transformation_matrices(Nx, Ny)
 
     # calculating the coarse resolution for reducing the number of grid points by 2 in each dimension, assuming odd number of points in each dimension
-    coarsexres = ceil((Nx-1)/2)
-    coarseyres = ceil((Ny-1)/2)
+    coarsexres = Int32(Nx/2)
+    coarseyres = Int32(Ny/2)
 
     # initializing coarse grid values in each dimension
     xcoarse = zeros(Float64, coarsexres)
     ycoarse = zeros(Float64, coarseyres)
 
-    # assuming dimensionality of both are the same? 
+    # assuming dimensionality of both are the same?
     xcoarse[:] = Restriction * x
     ycoarse[:] = Restriction * y
 
@@ -93,7 +93,7 @@ function fine_to_coarse(Nx::Int32, Ny::Int32, x::Vector{Float64}, y::Vector{Floa
     xcoarse = zeros(Float64, coarsexres)
     ycoarse = zeros(Float64, coarseyres)
 
-    # assuming dimensionality of both are the same? 
+    # assuming dimensionality of both are the same?
     xcoarse[:] = Interpolation * x
     ycoarse[:] = Interpolation * y
 
@@ -136,6 +136,15 @@ function residual(A::SparseMatrixCSC, x::Vector{Float64}, b::Vector{Float64})
     return rfine
 end
 
+function residual(A::Matrix{Float64}, x::Vector{Float64}, b::Vector{Float64})
+    # calculates the residual associated with the vector equation we're trying to solve
+
+    # definition of residual on fine grid
+    rfine = b - A * x
+
+    return rfine
+end
+
 function restricted_residual(A::SparseMatrixCSC, x::Vector{Float64}, b::Vector{Float64}, Nx::Int32, Ny::Int32)
     # calculates the residual on the coarse grid
 
@@ -159,7 +168,7 @@ function multigrid_error(e::Vector{Float64}, A::SparseMatrixCSC, Nx::Int32, Ny::
 
     # definition of multigrid correction given true fine grid error
     E = S * e
-    
+
     return E
 end
 
@@ -168,7 +177,7 @@ end
 # may not need y vector - check later if issue doesn't get resolved
 function multigrid_step(grid::Grid, A::SparseMatrixCSC, xcalc::Vector{Float64}, xguess::Vector{Float64}, b::Vector{Float64})
     # steps through one step of multigrid from fine to coarse and back according to the steps in the MIT page
-    
+
     Nx = grid.Nx
     Ny = grid.Ny
 
@@ -211,7 +220,7 @@ end
 
 function v_cycle(grid::Grid, A::SparseMatrixCSC, xcalc::Vector{Float64}, b::Vector{Float64})
     # steps through one step of multigrid from fine to coarse and back according to the steps in the MIT page
-    
+
     Nx = grid.Nx
     Ny = grid.Ny
 
@@ -258,12 +267,20 @@ function v_cycle_general(grids::Diffresgrids, A::SparseMatrixCSC, x::Vector{Floa
     # doing a v-cycle in the formatting of the rest of the code (no restricted grids)
 
     # loading the restriction/interpolation matrices into concise variables
-    R1 = grids.R1p
-    R2 = grids.R2p
-    R3 = grids.R3p
-    I1 = grids.I1p
-    I2 = grids.I2p
-    I3 = grids.I3p
+    R1 = grids.R1
+    R2 = grids.R2
+    R3 = grids.R3
+    I1 = grids.I1
+    I2 = grids.I2
+    I3 = grids.I3
+    Nx = grids.Nx
+    Ny = grids.Ny
+    Nx1 = grids.Nx1
+    Ny1 = grids.Ny1
+    Nx2 = grids.Nx2
+    Ny2 = grids.Ny2
+    Nx3 = grids.Nx3
+    Ny3 = grids.Ny3
 
     # calculating the form of the matrix/residual at different resolutions
     """- error is calculated through smoothing (using given error and residual)
@@ -275,35 +292,37 @@ function v_cycle_general(grids::Diffresgrids, A::SparseMatrixCSC, x::Vector{Floa
     IF AT LOWEST RESOLUTION
     - error is given by smoothing function at lowest resolution"""
 
-    Acoarse1 = project_to_coarse(A, Nx, Ny, R1, I1)
+
+    Acoarse1 = sparse(project_to_coarse(A, Nx, Ny, R1, I1))
     x1 = R1 * x
     b1 = R1 * b
+    r = residual(Acoarse1, x1, b1)
     Einitial1 = zeros(Float64, size(x1))
-    Ecoarse1 = jacobi_smooth(Acoarse1, Einitial1, rcoarse1, 1, 1, 1, 1, .1)
+    Ecoarse1 = jacobi_smooth(Acoarse1, Einitial1, r, 1., 1, 1, 1)
     rcoarse1 = Acoarse1 * Ecoarse1
     rcoarse2 = R2 * rcoarse1
 
-    Acoarse2 = project_to_coarse(Acoarse1, Nx1, Ny1, R2, I2)
+    Acoarse2 = sparse(project_to_coarse(Acoarse1, Nx1, Ny1, R2, I2))
     x2 = R2 * x1
     b2 = R2 * b1
     Einitial2 = zeros(Float64, size(x2))
-    Ecoarse2 = jacobi_smooth(Acoarse2, Einitial2, rcoarse2, 1, 1, 1, 1, .1)
+    Ecoarse2 = jacobi_smooth(Acoarse2, Einitial2, rcoarse2, 1., 1, 1, 1)
     rcoarse2_1 = Acoarse2 * Ecoarse2
     rcoarse3 = R3 * rcoarse2_1
 
-    Acoarse3 = project_to_coarse(Acoarse2, Nx2, Ny2, R3, I3)
+    Acoarse3 = sparse(project_to_coarse(Acoarse2, Nx2, Ny2, R3, I3))
     x3 = R3 * x2
     b3 = R3 * b2
     Einitial3 = zeros(Float64, size(x3))
-    Ecoarse3 = jacobi_smooth(Acoarse3, Einitial3, rcoarse3, 1, 1, 1, 1, .1)
+    Ecoarse3 = jacobi_smooth(Acoarse3, Einitial3, rcoarse3, 1., 1, 1, 1) # maybe want to do exact solution at lowest res?
     rcoarse3_1 = Acoarse3 * Ecoarse3
     rcoarse2_2 = I3 * rcoarse3_1
 
-    Ecoarse2_1 = jacobi_smooth(Acoarse2, Einitial2, rcoarse2_2, 1, 1, 1, 1, .1)
+    Ecoarse2_1 = jacobi_smooth(Acoarse2, Einitial2, rcoarse2_2, 1., 1, 1, 1)
     rcoarse2_3 = Acoarse2 * Ecoarse2_1
     rcoarse1_2 = I2 * rcoarse2_3
 
-    Ecoarse1_1 = jacobi_smooth(Acoarse1, Einitial1, rcoarse1_2, 1, 1, 1, 1, .1)
+    Ecoarse1_1 = jacobi_smooth(Acoarse1, Einitial1, rcoarse1_2, 1., 1, 1, 1)
     rcoarse1_3 = Acoarse1 * Ecoarse1_1 # these two calculations may not be necessary
     rfine = I1 * rcoarse1_3
     Efine = Ecoarse1_1
@@ -324,5 +343,5 @@ function v_cycle_general(grids::Diffresgrids, A::SparseMatrixCSC, x::Vector{Floa
 
     x = x + Efine
 
-    return x
+    return x, Efine
 end
