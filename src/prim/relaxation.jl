@@ -64,9 +64,9 @@ function setup_jacobi_smoothing(A::SparseMatrixCSC, w::Float64, grd::Grid)
 end
 
 
-function jacobi_smooth(n::Int64, M::MultiResMatrix, D::MultiResMatrix, r::Vector{Float64})
+function jacobi_smooth(n::Int64, M::MultiResMatrix, D::MultiResMatrix, x0::Vector{Float64}, r::Vector{Float64})
 
-    x = zeros(Float64, length(r))
+    x = x0[:]
     f = D * r
     for dummy=1:n
         x[:] = M * x + f
@@ -84,22 +84,26 @@ end
 function vcycle(A::MultiResMatrix, x0::Vector{Float64}, b::Vector{Float64}, M::MultiResMatrix, D::MultiResMatrix, n::Int64, grd::Grid)
 
     # compute initial residual
-    r = residual(A, x0, b)
+    r = b - A*x0
 
     # relax on coarser grids
     for Restr in grd.restrictions
-        x = jacobi_smooth(n, M, D, r)
-        r = Restr*residual(A, x, r)
+        x = jacobi_smooth(n, M, D, zeros(Float64, length(r)), r)
+        r = Restr*(r - A*x)
     end
 
+    # solve exactly on course grid, then interpolate
+    x_crs = grd.interpolations[1] * (A.mats[end] \ r)
+    r = grd.interpolations[1]*r - A * (x + x_crs)
+
     # relax on finer grids
-    for Interp in grd.interpolations
-        x = jacobi_smooth(n, M, D, r)
-        r = Interp*residual(A, x, r)
+    for Interp in grd.interpolations[2:end]
+        x = jacobi_smooth(n, M, D, zeros(Float64, length(r)), r)
+        r = Interp*(r - A*x)
     end
 
     # final smoothing
-    x = jacobi_smooth(n, M, D, r)
+    x = jacobi_smooth(n, M, D, zeros(Float64, length(r)), r)
     return x0 + x
 end
 
@@ -112,16 +116,15 @@ function pure_jacobi(A0::SparseMatrixCSC, x0::Vector{Float64}, b::Vector{Float64
     # compute norm of b, initialize error
     bnorm = norm(b)
     err = 1.0
+    x = x0[:]
     println()
-
-    r = residual(A, x0, b)
 
     # interate until norm(residual) / bnorm < 10^-8
     n_iters = 0
     max_iters = 1000
     while (err > 1e-8) && (n_iters < max_iters)
-        x = jacobi_smooth(100, M, D, r)
-        r = residual(A, x, r)
+        x[:] = jacobi_smooth(100, M, D, x, b) #XXX: This actually doesn't make sense, should just make jacobi_smooth depend on an initial guess.
+        r = residual(A, x, b)
         err = norm(r) / bnorm
         n_iters += 1
         println(err)
@@ -143,9 +146,9 @@ function multigrid_solve(A0::SparseMatrixCSC, x::Vector{Float64}, b::Vector{Floa
 
     # interate until norm(residual) / bnorm < 10^-8
     n_iters = 0
-    max_iters = 100
+    max_iters = 1000
     while (err > 1e-8) && (n_iters < max_iters)
-        x = vcycle(A, x, b, M, D, 10, grd)
+        x = vcycle(A, x, b, M, D, 100, grd)
         err = norm(residual(A, x, b)) / bnorm
         n_iters += 1
         println(err)
