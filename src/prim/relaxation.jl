@@ -89,7 +89,7 @@ function vcycle(A::MultiResMatrix, x0::Vector{Float64}, b::Vector{Float64}, M::M
     # relax on coarser grids
     for Restr in grd.restrictions
         x = jacobi_smooth(n, M, D, zeros(Float64, length(r)), r)
-        r = Restr*residual(A, x, r)
+        r = Restr*residual(A, x, r) #XXX is this correct? same mistake as before?
     end
 
     # relax on finer grids
