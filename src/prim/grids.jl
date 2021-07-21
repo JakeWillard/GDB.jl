@@ -250,3 +250,10 @@ function f_to_grid(f::Function, grid::Grid)
 
     return vec
 end
+
+
+# overloading Base.map() to operate on the points in the grid, using pmap instead of usual map
+function Base.map(f::Function, grd::Grid)
+
+    return pmap(f, [grd.points[:,i] for i=1:grd.Nk])
+end
