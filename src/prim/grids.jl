@@ -86,8 +86,8 @@ function edge_trim_double(points0::Matrix{Float64}, walls::Vector{Wall}, deltas:
                 y = points0[2,l] + (j-1)*dy
                 deltaX = x - bottom_left[1]
                 deltaY = y - bottom_left[2]
-                ic = Int(round(deltaX/dx))
-                jc = Int(round(deltaY/dy))
+                ic = Int(round(deltaX/dx)) + 1
+                jc = Int(round(deltaY/dy)) + 1
 
                 if inside(x, y, deltas, walls)
                     Nk += 1
@@ -162,11 +162,11 @@ struct Grid
     restrictions::Vector{SparseMatrixCSC}
     interpolations::Vector{SparseMatrixCSC}
     nanmask::Matrix{Float64}
-    mx::Int32
-    my::Int32
-    Nx::Int32
-    Ny::Int32
-    Nk::Int32
+    mx::Int64
+    my::Int64
+    Nx::Int64
+    Ny::Int64
+    Nk::Int64
     Mxinv::Matrix{Float64}
     Myinv::Matrix{Float64}
     MxyinvT::Matrix{Float64}
@@ -249,4 +249,27 @@ function f_to_grid(f::Function, grid::Grid)
     end
 
     return vec
+end
+
+
+# overloading Base.map() to operate on the points in the grid, using pmap instead of usual map
+function grid_map(f::Function, outsize::Tuple{Int64, Int64}, grd::Grid)
+
+    n, m = outsize
+    output = SharedArray{Float64}((n*grd.Nk,m))
+
+    # @distributed unfortunately only works if nprocs > 1
+    if nprocs() > 1
+        @distributed for i=1:grd.Nk
+            k = 1 + n*(i-1)
+            output[k:k+n-1,:] = f(grd.points[:,i]..., grd)
+        end
+    else
+        for i=1:grd.Nk
+            k = 1 + n*(i-1)
+            output[k:k+n-1,:] = f(grd.points[:,i]..., grd)
+        end
+    end
+
+    return output[:,:]
 end
