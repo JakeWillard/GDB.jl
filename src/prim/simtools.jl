@@ -148,7 +148,7 @@ function save_variables(path::String, vars...)
 
     # save each var
     for var in vars
-        fid["$(var.name)"][:,:,t] = var[:,:,2]
+        fid["Output/$(var.name)"][:,:,t] = var[:,:,2]
     end
 
     # increase time index
@@ -160,8 +160,10 @@ function save_variables(path::String, vars...)
 end
 
 
-function integrate_then_save(path::String, tstep::Function, Nskp::Int64, params::Vector{Float64}, stp::Setup, vars...)
+# NOTE: lets assume always that the first element of params is Nksp, the number of timesteps between saves.
+function integrate_then_save(path::String, tstep::Function, params::Vector{Float64}, stp::Setup, vars...)
 
+    Nskp = Int64(params[1])
     for _=1:Nskp
         tstep(params, stp, vars...)
     end
