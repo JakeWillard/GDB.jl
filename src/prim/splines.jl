@@ -57,12 +57,13 @@ function interpolation_row(x, y, x0, y0, dx, dy, MinvT, Nx, Ny, mx, my)
     jcs = Int(ceil(my/2.0))
 
     # indices for center point in grid
-    icg = Int(floor((x - x0)/dx))+1
-    jcg = Int(floor((y - y0)/dy))+1
+    # NOTE: the addition of 1e-5 before calling floor is to compensate for annoying floating point imprecision.
+    icg = Int(floor((x - x0)/dx + 1e-5)) + 1
+    jcg = Int(floor((y - y0)/dy + 1e-5)) + 1
 
     # values for row
-    xr = (x - x0)/dx+1 - icg
-    yr = (y - y0)/dy+1 - jcg
+    xr = (x - x0)/dx - (icg - 1)
+    yr = (y - y0)/dy - (jcg - 1)
     spline = spline2d(xr, yr, mx, my)
     row_dat = MinvT * spline
 
@@ -73,7 +74,7 @@ function interpolation_row(x, y, x0, y0, dx, dy, MinvT, Nx, Ny, mx, my)
     row_js = zeros(Int, mx*my)
     for i=1:mx
         for j=1:my
-            row_js[i+(j-1)*mx] = k0 + (i-1) + (j)*Nx
+            row_js[i+(j-1)*mx] = k0 + (i-1) + (j-1)*Nx
         end
     end
 

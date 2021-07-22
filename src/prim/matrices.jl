@@ -61,28 +61,6 @@ function interpolation_row(x, y, grid::Grid)
     return interpolation_row(x, y, grid.origin[1], grid.origin[2], grid.dx, grid.dy, grid.MxyinvT, grid.Nx, grid.Ny, grid.mx, grid.my)
 end
 
-#
-# function interpolation_matrix(points, grid::Grid)
-#
-#     dat = Float64[]
-#     is = Int32[]
-#     js = Int32[]
-#
-#     Np = size(points)[2]
-#     for k=1:Np
-#         x = points[1,k]
-#         y = points[2,k]
-#         row_dat, row_js = interpolation_row(x, y, grid)
-#         row_is = k*ones(Int, grid.mx*grid.my)
-#
-#         dat = [dat; row_dat]
-#         is = [is; row_is]
-#         js = [js; row_js]
-#     end
-#
-#     return sparse(is, js, dat, Np, grid.Nx*grid.Ny) * grid.inverse_projection
-# end
-
 
 function reflection_matrix(delta::Float64, wall::Wall, grd::Grid)
 
@@ -108,23 +86,6 @@ function reflection_matrix(delta::Float64, wall::Wall, grd::Grid)
 
     return sparse(is, js, dat, grd.Nk, grd.Nx*grd.Ny) * grd.inverse_projection
 end
-
-#
-# function reflection_matrix(delta, wall::Wall, grd::Grid)
-#
-#     points = zeros(Float64, (2, grd.Nk))
-#
-#     for k=1:grd.Nk
-#         x, y = grd.points[:,k]
-#         if 0 < smoothstep(x, y, delta, wall) < 1
-#             points[:,k] = wall.reflect(x, y)
-#         else
-#             points[:,k] = grd.points[:,k]
-#         end
-#     end
-#
-#     return interpolation_matrix(points, grd)
-# end
 
 
 function penalization_matrix(delta, wall::Wall, grd::Grid)
@@ -158,36 +119,3 @@ function fieldline_map_matrix(bx::Function, by::Function, bz::Function, ds::Floa
     matrix = sparse(is, js, dat, grd.Nk, grd.Nx*grd.Ny) * grd.inverse_projection
     return matrix, dS
 end
-
-#
-# function fieldline_forward_map(bx::Function, by::Function, bz::Function, ds::Float64, Nz::Int64, grd::Grid)
-#
-#     deltaPhi = 2*pi / Nz
-#     dS = zeros(Float64, grd.Nk)
-#     points = zeros(Float64, (2, grd.Nk))
-#     for k=1:grd.Nk
-#         x0, y0 = grd.points[:,k]
-#         x, y, deltaS = trace_fieldline(x0, y0, bx, by, bz, ds, deltaPhi)
-#         dS[k] = deltaS
-#         points[:,k] = [x,y]
-#     end
-#
-#     return interpolation_matrix(points, grd), dS
-# end
-#
-#
-# # NOTE: this is a copy of fieldline_forward_map but the sign of ds is flipped.
-# function fieldline_backward_map(bx::Function, by::Function, bz::Function, ds::Float64, Nz::Int64, grd::Grid)
-#
-#     deltaPhi = 2*pi / Nz
-#     dS = zeros(Float64, grd.Nk)
-#     points = zeros(Float64, (2, grd.Nk))
-#     for k=1:grd.Nk
-#         x0, y0 = grd.points[:,k]
-#         x, y, deltaS = trace_fieldline(x0, y0, bx, by, bz, -ds, deltaPhi)
-#         dS[k] = deltaS
-#         points[:,k] = [x,y]
-#     end
-#
-#     return interpolation_matrix(points, grd), dS
-# end

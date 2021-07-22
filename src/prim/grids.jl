@@ -86,8 +86,8 @@ function edge_trim_double(points0::Matrix{Float64}, walls::Vector{Wall}, deltas:
                 y = points0[2,l] + (j-1)*dy
                 deltaX = x - bottom_left[1]
                 deltaY = y - bottom_left[2]
-                ic = Int(round(deltaX/dx))
-                jc = Int(round(deltaY/dy))
+                ic = Int(round(deltaX/dx)) + 1
+                jc = Int(round(deltaY/dy)) + 1
 
                 if inside(x, y, deltas, walls)
                     Nk += 1
