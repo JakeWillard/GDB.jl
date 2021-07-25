@@ -49,9 +49,46 @@ function y_derivative(n, grid::Grid)
 end
 
 
+function regular_derivative_1d(N, n, Minv)
+
+    D = sparse(zeros(Float64, (N, N)))
+    stencil = Minv[n+1,:]
+    m = length(stencil)
+    ic = Int(ceil(m/2.0))
+
+    for i=1:m
+        k = i - ic
+        vec = stencil[i] * ones(N - abs(k))
+        D += spdiagm(k => vec)
+    end
+
+    return D
+end
+
+
+function derivative_matrix(nx, ny, grd::Grid)
+
+    Dx = regular_derivative_1d(grd.Nx, nx, grd.Mxinv)
+    Dy = regular_derivative_1d(grd.Ny, ny, grd.Myinv)
+
+    D = kron(Dy, Dx)
+    Pinv = grid.inverse_projection
+    P = grid.projection
+
+    return P * D * Pinv / ((grd.dx)^nx *(grd.dy)^ny)
+end
+
+
+
 function laplacian(grid::Grid)
 
     return x_derivative(2, grid) + y_derivative(2, grid)
+end
+
+
+function new_laplacian(grd::Grid)
+
+    return derivative_matrix(2, 0, grd) + derivative_matrix(0, 2, grd)
 end
 
 
