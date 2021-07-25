@@ -28,6 +28,7 @@ end
 
 function partial_ss()
 
+
 end
 
 
@@ -42,7 +43,7 @@ end
 function lnTe_total_electron_derivative_adiabatic()
 
    _a = (2/3)*(lnn_Dt + er*ad*j.*lnn_s./n)
-   _b = -5/3*er*ad*(Te .* lnTe_c)
+   _b = -(5/3)*er*ad*(Te .* lnTe_c)
 
    return _a + _b
 end
@@ -56,10 +57,9 @@ end
 function lnTi_total_ion_derivative_adiabatic()
 
    _a = (2/3)*lnn_Dt
-   _b = 5/3*er*ad*(Ti .* lnTi_c)
-   _c = 0 # XXX conductivity term
+   _b = (5/3)*er*ad*(Ti .* lnTi_c)
 
-   return _a + _b + _c
+   return _a + _b
 end
 
 
@@ -73,7 +73,8 @@ function u_total_ion_derivative()
    _a = -ev*(Pe_s + Pi_s) ./ n
    _b = -4*ev*eg*G_s ./ n
    _c = er*ad*(Ti .* u_c)
-   return _a + _b + _c
+
+   return +(_a, _b, _c)
 end
 
 
@@ -97,31 +98,49 @@ function w_partial_t()
    _j = -ad*(phi_yy.*lnn_x.*Pi_y + phi_y.*lnn_xy.*Pi_y + phi_y.*lnn_x.*Pi_yy)
    _k = -eg*G_c - Pe_c - Pi_c + j_s
 
-   return _a + _b + _c + _d + _e + _f + _g + _h + _i + _j + _k
+   return +(_a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k)
 end
 
 
 function A_partial_t()
 
    # poisson bracket term
-   pb = de2 * (phi_x .* jn_y - phi_y .* jn_x)
+   _a = de2 * (phi_x .* jn_y - phi_y .* jn_x)
+   _b = de2 * ue.*jn_s / ev
+   _c = (phi_s - ad*Pe_s ./ n) / am
+   _d = eta*(j ./ Te.^(3/2))
 
-   # current term
-   cur = 0 #XXX
-
-   # parallel term
-   par = (phi_s - ad*Pe_s ./ n) / am
-
-   # resistivity term
-   res = eta*(j ./ Te.^(3/2))
-
-   return pb + cur + par + res
+   return +(_a, _b, _c, _d)
 end
 
 
-function G_formula()
+function compute_j_bohm()
+
+
+end
+
+
+function compute_G()
 
    return Ti.^(5/2) .* (er*(phi_c + ad*Pi_c) - 4*ev*u_s)
+end
+
+
+function compute_ue()
+
+
+end
+
+
+function density_source()
+
+
+end
+
+
+function heat_source()
+
+
 end
 
 
@@ -170,8 +189,11 @@ function diffusion_A_rhs()
 end
 
 
-function penalized_time_step()
+function penalized_forward_euler(f, g, dt, c0, c1, c2, c3)
 
+   lam = 1 .+ dt*(c1 + c2 + c3)
+   g2 = +(c0.*g, c1.*f1, c2.*f2, c3.*f3)
+   return (f + dt*g2) ./ lam
 end
 
 
