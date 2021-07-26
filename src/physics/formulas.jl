@@ -100,7 +100,7 @@ end
 
 function compute_j_bohm()
 
-    cs = sqrt.(Te + Ti / mi)
+    cs = sqrt.(Te + Ti)
     lambda = 2.695
     return ev * n.*cs.*(1 .- exp.(lambda .- phi ./(ad*Te)))
 end
@@ -192,7 +192,7 @@ end
 
 function diffusion_u_rhs()
 
-    return P0*u + 0.5*P3*(I + R3)*sqrt.((Te + Ti)/mi)
+    return P0*u + 0.5*P3*(I + R3)*sqrt.(Te + Ti)
 end
 
 
