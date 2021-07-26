@@ -1,25 +1,5 @@
 
 
-function compute_params()
-
-   c = 1 #XXX
-   cs0 = sqrt(T0 / mi)
-   t0 = sqrt(a*R0/2) / cs0
-
-   am = R0*beta0/a
-   ad = cs0^2 * t0 / (omega_ci*a^2)
-   ki = 2*3.9*t0*tau_i*Ti0 / (R0^2 * mi)
-   ke = 2*3.2*t0*tau_e*Te0 / (R0^2 * me)
-   er = 2*a/R0
-   eg = 0.08*tau_i / t0
-   ev = cs0*t0/R0
-   de2 = c / (a*omega_pe0)
-   eta = 0.51*t0*de2 / tau_e
-
-   return Float64[am, ad, ki, ke, er, eg, ev, de2, eta]
-end
-
-
 function partial_s(f, f_x, f_y, psi_x, psi_y, am, Ds)
 
     return Ds*f + am*(psi_x .* f_y - psi_y .* f_x)
@@ -28,7 +8,7 @@ end
 
 function partial_ss()
 
-
+   #XXX just apply partial_s twice for now to compute f_ss
 end
 
 
@@ -51,6 +31,8 @@ end
 
 function lnTe_partial_thermal()
 
+   _a = (7/2)*lnTe_s.^2 + lnTe_ss
+   return ke*Te.^(5/2) * _a ./ n
 end
 
 
@@ -65,6 +47,8 @@ end
 
 function lnTi_partial_thermal()
 
+   _a = (7/2)*lnTi_s.^2 + lnTi_ss
+   return ki*Ti.^(5/2) * _a ./ n
 end
 
 
@@ -116,7 +100,9 @@ end
 
 function compute_j_bohm()
 
-
+   cs = sqrt.(Te + Ti / mi)
+   lambda = 2.695
+   return ev * n.*cs.*(1 .- exp.(lambda .- phi ./(ad*Te)))
 end
 
 
@@ -128,19 +114,19 @@ end
 
 function compute_ue()
 
-
+   return u - jn / ev
 end
 
 
 function density_source()
 
-
+   return 0 #XXX no sources for now
 end
 
 
 function heat_source()
 
-
+   return 0 #XXX no sources for now
 end
 
 
@@ -149,51 +135,83 @@ function vorticity_lhs()
    N = Diagonal(n)
    lnN_x = Diagonal(lnn_x)
    lnN_y = Diagonal(lnn_y)
-   return N * (L + lnN_x*Dx + lnN_y*Dy)
+
+   _A = P0 * N * (L + lnN_x*Dx + lnN_y*Dy)
+   _B = P1  # XXX try this condition without the reflection at first
+   _C = 0.5*P2*(I + R2)
+   _D = 0.5*P3*(I + R3)
+
+   return +(_A, _B, _C, _D)
 end
 
 
 function vorticity_rhs()
 
-   return w - ad*(Pi_xx + Pi_yy)
+   lambda = 2.695
+   _a = P0*(w - ad*(Pi_xx + Pi_yy))
+   _b = P1*lnn_b # XXX try this condition without the reflection at first
+   _c = 0.5*lambda*P2*(I + R2)*lnTe
+   _d = 0.5*lambda*P3*(I + R3)*lnTe
+
+   return +(_a, _b, _c, _d)
 end
 
 
 function diffusion_neumann_lhs()
 
-end
+   _A = P0 * (I - k*L)
+   _B = P1*(I - R1)
+   _C = P2*(I - R2)
+   _D = P3*(I - R3)
 
-
-function diffusion_neumann_rhs()
-
+   return +(_A, _B, _C, _D)
 end
 
 
 function diffusion_dirichlet_lhs()
 
+   _A = P0 * (I - k*L)
+   _B = 0.5*P1*(I + R1)
+   _C = 0.5*P2*(I + R2)
+   _D = 0.5*P3*(I + R3)
+
+   return +(_A, _B, _C, _D)
 end
 
 
-function diffusion_dirichlet_rhs()
+function diffusion_u_lhs()
 
+   _A = P0 * (I - k*L)
+   _B = P1*(I - R1)
+   _C = P2*(I - R2)
+   _D = 0.5*P3*(I + R3)
+
+   return +(_A, _B, _C, _D)
 end
 
 
-function diffusion_A_lhs()
+function diffusion_u_rhs()
 
+   return P0*u + 0.5*P3*(I + R3)*sqrt.((Te + Ti)/mi)
 end
 
 
 function diffusion_A_rhs()
 
+   return P0*A + 0.5*P3*(I + R3)*Abohm
 end
 
 
-function penalized_forward_euler(f, g, dt, c0, c1, c2, c3)
+function penalized_forward_euler(f, f_t, dt, p0, p1, p2, p3, q1, q2, q3)
 
-   lam = 1 .+ dt*(c1 + c2 + c3)
-   g2 = +(c0.*g, c1.*f1, c2.*f2, c3.*f3)
-   return (f + dt*g2) ./ lam
+   c1 = p1 / q1
+   c2 = p2 / q2
+   c3 = p3 / q3
+
+   _a = 1 .+ dt*(c1 + c2 + c3)
+   _b = +(p0.*f_t, c1.*f1, c2.*f2, c3.*f3)
+
+   return (f + dt*_b) ./ _a
 end
 
 

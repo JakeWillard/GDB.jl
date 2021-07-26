@@ -8,6 +8,8 @@ electron_collision_time(n, T, q, m, l) = 3*sqrt(m)*T^(3/2) / (4*sqrt(2*pi)*l*n*q
 
 ion_collision_time(n, T, q, m, l) = 3*sqrt(m)*T^(3/2) / (4*sqrt(pi)*l*n*q^4)
 
+sound_speed(T, m) = sqrt(T / m)
+
 plasma_beta(n, T, B) = 4*pi*n*T / B^2
 
 
@@ -31,7 +33,7 @@ function dimensionless_parameters(a, R0, n0, T0, B0)
     tau_i = ion_collision_time(n0, T0, q, mi, 1)
     tau_e = electron_collision_time(n0, T0, q, me, 1)
     beta0 = plasma_beta(n0, T0, B0)
-    cs0 = sqrt(T0 / mi)
+    cs0 = sound_speed(T0, mi)
     t0 = sqrt(a*R0/2) / cs0
 
     # parameters for gdb model
