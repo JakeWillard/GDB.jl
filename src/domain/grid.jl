@@ -62,7 +62,7 @@ function vec_to_mesh(vec, grd::Grid)
         out[:,j] = vals[1+(j-1)*Nx:j*Nx]
     end
 
-    return out .* grid._nan_outside
+    return out .* grid._nan_outside_boundaries
 end
 
 
