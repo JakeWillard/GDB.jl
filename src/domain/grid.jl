@@ -3,7 +3,7 @@ struct Grid
 
     r0 :: Vector{Float64}
     points :: Matrix{Float64}
-    Proj :: SparseMatrixCSS
+    Proj :: SparseMatrixCSC
     dx :: Float64
     dy :: Float64
     _Nx :: Int64
