@@ -136,5 +136,5 @@ function PolyBarrier(vert)
         return ray_reflection(x, y, r1, r2)
     end
 
-    return Wall(func, 0.0, rmap)
+    return Barrier(func, 0.0, rmap)
 end
