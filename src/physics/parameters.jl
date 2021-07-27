@@ -13,6 +13,7 @@ sound_speed(T, m) = sqrt(T / m)
 plasma_beta(n, T, B) = 4*pi*n*T / B^2
 
 
+#NOTE: input cgs units, except T0, inpute eV for T0
 function dimensionless_parameters(a, R0, n0, T0, B0)
 
     # constants
