@@ -1,6 +1,6 @@
 
 
-function partial_s(f, f_x, f_y, psi_x, psi_y, am, Ds)
+function partial_s(f, f_x, f_y, psi_x, psi_y, Ds, am)
 
     return Ds*f + am*(psi_x .* f_y - psi_y .* f_x)
 end
@@ -12,15 +12,15 @@ function partial_ss()
 end
 
 
-function lnn_total_ion_derivative()
+function lnn_total_ion_derivative(phi_c, Pe_c, n, j_s, u_s, er, ev, ad)
 
     _a = er*phi_c - er*ad*Pe_c ./ n
-    _b = er*ad*j_s ./ n - ev*vp_s
+    _b = er*ad*j_s ./ n - ev*u_s
     return _a + _b
 end
 
 
-function lnTe_total_electron_derivative_adiabatic()
+function lnTe_total_electron_derivative_adiabatic(lnn_Dt, j, lnn_s, n, Te, lnTe_c, er, ad)
 
     _a = (2/3)*(lnn_Dt + er*ad*j.*lnn_s./n)
     _b = -(5/3)*er*ad*(Te .* lnTe_c)
@@ -29,14 +29,7 @@ function lnTe_total_electron_derivative_adiabatic()
 end
 
 
-function lnTe_partial_thermal()
-
-    _a = (7/2)*lnTe_s.^2 + lnTe_ss
-    return ke*Te.^(5/2) * _a ./ n
-end
-
-
-function lnTi_total_ion_derivative_adiabatic()
+function lnTi_total_ion_derivative_adiabatic(lnn_Dt, Ti, lnTi_c, er, ad)
 
     _a = (2/3)*lnn_Dt
     _b = (5/3)*er*ad*(Ti .* lnTi_c)
@@ -46,14 +39,14 @@ end
 
 
 # NOTE: this one is written to be species-ambiguous since it applies to Te and Ti
-function lnT_partial_thermal()
+function lnT_partial_thermal(lnT_s, lnT_ss, T, n, k)
 
     _a = (7/2)*lnT_s.^2 + lnT_ss
     return k*T.^(5/2) * _a ./ n
 end
 
 
-function u_total_ion_derivative()
+function u_total_ion_derivative(Pe_s, Pi_s, n, G_s, n, Ti, u_c, ev, eg, er, ad)
 
     _a = -ev*(Pe_s + Pi_s) ./ n
     _b = -4*ev*eg*G_s ./ n
@@ -69,7 +62,7 @@ function general_partial_derivative(f_Dt, f_x, f_y, f_s, phi_x, phi_y, v)
 end
 
 
-function w_partial_t()
+function w_partial_t(n, lnn_x, ) #XXX No dependence on lnn_xx, despite dependence on lnn_yy? Mistake?
 
     _a = n.*(lnn_x.*phi_x.*phi_xy + phi_xx.*phi_xy + phi_x.*phi_xxy)
     _b = -n.*(lnn_x.*phi_y*phi_xx + phi_xy.*phi_xx + phi_y.*phi_xxx)
@@ -87,7 +80,7 @@ function w_partial_t()
 end
 
 
-function A_partial_t()
+function A_partial_t(phi_x, phi_y, phi_s, j, jn_x, jn_y, jn_s, ue, n, Te, de2, ev, ad, am, eta)
 
     _a = de2 * (phi_x .* jn_y - phi_y .* jn_x)
     _b = de2 * ue.*jn_s / ev
@@ -98,7 +91,7 @@ function A_partial_t()
 end
 
 
-function compute_j_bohm()
+function compute_j_bohm(Te, Ti, n, phi, ev, ad)
 
     cs = sqrt.(Te + Ti)
     lambda = 2.695
@@ -106,13 +99,13 @@ function compute_j_bohm()
 end
 
 
-function compute_G()
+function compute_G(Ti, phi_c, Pi_c, u_s, er, ev, ad)
 
     return Ti.^(5/2) .* (er*(phi_c + ad*Pi_c) - 4*ev*u_s)
 end
 
 
-function compute_ue()
+function compute_ue(u, jn, ev)
 
     return u - jn / ev
 end
@@ -130,7 +123,7 @@ function heat_source()
 end
 
 
-function vorticity_lhs()
+function vorticity_lhs(n, lnn_x, lnn_y, L, Dx, Dy, P0, P1, P2, P3, R1, R2, R3)
 
     N = Diagonal(n)
     lnN_x = Diagonal(lnn_x)

@@ -1,4 +1,40 @@
 
+# multigrid transfer operators
+function intergrid_1d_interp(N, Minv)
+
+    m = size(Minv)[1]
+    ic = Int(ceil(m/2.0))
+    sten = transpose(Minv) * Float64[(0.5)^(j-1)/factorial(j-1) for j=1:m]
+
+    Ih = zeros(Float64, (N,N))
+    Is = I + Ih
+    for i=1:m
+        k = i - ic
+        vec = sten[i] * ones(N - abs(k))
+        Ih += diagm(k => vec)
+    end
+
+    Iout = zeros(Float64, (2*N,N))
+    Iout[1:2:end,:] = Is
+    Iout[2:2:end,:] = Ih
+    return Iout
+end
+
+
+function transfer_matrices(Nx0, Ny0, Mxinv, Myinv, P0, P1)
+
+    Ix = intergrid_1d_interp(Nx0, Mxinv)
+    Iy = intergrid_1d_interp(Ny0, Myinv)
+    Ic = kron(sparse(Iy), sparse(Ix))
+    Rc = transpose(Ic) / 4.0
+
+    Restr = P0 * Rc * transpose(P1)
+    Interp = P1 * Ic * transpose(P0)
+    return Restr, Interp
+end
+
+
+
 # the idea behind this struct is that instances represent a matrix at multiple resolutions. Not only
 # can the same matrix at different resolutions be represented by the same variable, but the algebra can be
 # simplified in a more elegant way too.
