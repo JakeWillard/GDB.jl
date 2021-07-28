@@ -62,7 +62,7 @@ function general_partial_derivative(f_Dt, f_x, f_y, f_s, phi_x, phi_y, v)
 end
 
 
-function w_partial_t(n, lnn_x, ) #XXX No dependence on lnn_xx, despite dependence on lnn_yy? Mistake?
+function w_partial_t(n, lnn_x) #XXX No dependence on lnn_xx, despite dependence on lnn_yy? Mistake?
 
     _a = n.*(lnn_x.*phi_x.*phi_xy + phi_xx.*phi_xy + phi_x.*phi_xxy)
     _b = -n.*(lnn_x.*phi_y*phi_xx + phi_xy.*phi_xx + phi_y.*phi_xxx)
