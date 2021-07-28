@@ -6,10 +6,10 @@ function partial_s(f, f_x, f_y, psi_x, psi_y, Ds, am)
 end
 
 
-function partial_ss()
-
-    #XXX just apply partial_s twice for now to compute f_ss
-end
+# function partial_ss()
+#
+#     #XXX just apply partial_s twice for now to compute f_ss
+# end
 
 
 function lnn_total_ion_derivative(phi_c, Pe_c, n, j_s, u_s, er, ev, ad)
@@ -111,16 +111,16 @@ function compute_ue(u, jn, ev)
 end
 
 
-function density_source()
-
-    return 0 #XXX no sources for now
-end
-
-
-function heat_source()
-
-    return 0 #XXX no sources for now
-end
+# function density_source()
+#
+#     return 0 #XXX no sources for now
+# end
+#
+#
+# function heat_source()
+#
+#     return 0 #XXX no sources for now
+# end
 
 
 function vorticity_lhs(n, lnn_x, lnn_y, L, Dx, Dy, P0, P1, P2, P3, R1, R2, R3)
