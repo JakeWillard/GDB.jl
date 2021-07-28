@@ -1,6 +1,8 @@
 
 
-function AnnalusTokamakGrid(L, h, a, R0, q0, s0, beta0, ds, delta, N, path)
+function annalus_long_calculations(L, h, a, R0, q0, s0, beta0, ds, delta, N, Nz, m, path)
+
+    # compute grid
 
     inner_flux_surface = AnnalusBarrier(R0-a+L/2, a, R0, q0, s0, beta0, ds)
     outer_flux_surface = AnnalusBarrier(R0-a-L/2, a, R0, q0, s0, beta0, ds)
@@ -14,9 +16,16 @@ function AnnalusTokamakGrid(L, h, a, R0, q0, s0, beta0, ds, delta, N, path)
 
     grd = Grid(inside, r0, r1, N, N)
 
+    # compute fieldline derivatives
+
+    psi, bx, by, bz = generate_annalus_fields(a, R0, q0, s0, beta0)
+    MinvT = stencil2d(m ,m)
+    Ds, Dss = fieldline_derivatives(bx, by, bz, ds, m, m, MinvT, Nz, grd)
+
     fid = h5open(path, "r+")
     save_grid(fid, "Grid", grd)
+    save_sparse_matrix(fid, Ds, "Ds")
+    save_sparse_matrix(fid, Dss, "Dss")
     close(fid)
 
-    return grd
 end
