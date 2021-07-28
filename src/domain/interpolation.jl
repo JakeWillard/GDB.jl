@@ -1,18 +1,3 @@
-
-
-function stencil1d(m::Int)
-
-    ic = Int(ceil(m/2.0))
-    M = zeros((m, m))
-    for i=1:m
-        for j=1:m
-            M[i, j] = (i - ic)^(j-1) / factorial(j-1)
-        end
-    end
-    return inv(M)
-end
-
-
 function spline2d(xr, yr, mx, my)
 
     out = zeros(Float64, mx*my)
@@ -28,7 +13,6 @@ function spline2d(xr, yr, mx, my)
 
     return out
 end
-
 
 
 function stencil2d(mx, my)
@@ -49,8 +33,14 @@ function stencil2d(mx, my)
     return transpose(inv(M))
 end
 
-# XXX not generalized for corners, must fix!
-function interpolation_row(x, y, x0, y0, dx, dy, MinvT, Nx, Ny, mx, my)
+
+function interpolation_row(x, y, mx, my, MinvT, grd::Grid)
+
+    x0, y0 = r0
+    dx = grd.dx
+    dy = grd.dy
+    Nx = grd._Nx
+    Ny = grd._Ny
 
     # (i,j) indices for center point of stencil
     ics = Int(ceil(mx/2.0))
@@ -79,4 +69,10 @@ function interpolation_row(x, y, x0, y0, dx, dy, MinvT, Nx, Ny, mx, my)
     end
 
     return row_dat, row_js
+end
+
+
+function interpolation_function(V::Vector{Float64}, mx, my, MinvT, grd::Grid)
+
+    return (x, y) -> dot(V, interpolation_row(x, y, mx, my, MinvT, grd))
 end

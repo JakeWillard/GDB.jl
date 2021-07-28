@@ -86,6 +86,16 @@ function FluxWall(psi, psi0, bx, by, ds)
 end
 
 
+# NOTE: it is useful sometimes to define a Wall that excludes all points
+function Nowhere()
+
+    func(x, y) = 1
+    val = Inf
+    reflect(x, y) = x, y
+    return Wall(func, val, reflect)
+end
+
+
 function smoothstep(x, y, delta, wall::Wall)
 
     u = (wall.func(x,y) - wall.val) / delta + 0.5

@@ -7,23 +7,21 @@ using SharedArrays
 using LinearAlgebra
 using SparseArrays
 using HDF5
+using ForwardDiff
 using RecipesBase
 
-include("./prim/trace.jl")
-include("./prim/walls.jl")
-include("./prim/splines.jl")
-include("./prim/grids.jl")
-include("./prim/matrices.jl")
-include("./prim/relaxation.jl")
-include("./prim/gmres.jl")
-include("./prim/simtools.jl")
+include("./domain/grid.jl")
+include("./domain/barrier.jl")
+include("./domain/interpolation.jl")
+include("./domain/operators.jl")
 
-include("./ideal_mhd/setup.jl")
-include("./ideal_mhd/io.jl")
-include("./ideal_mhd/recipes.jl")
-include("./ideal_mhd/integration.jl")
-include("./ideal_mhd/simulation.jl")
+include("./linsolve/gmres.jl")
+include("./linsolve/relaxation.jl")
+include("./linsolve/solvers.jl")
 
+include("./magflux/trace.jl")
+include("./magflux/maps.jl")
+include("./magflux/annalus.jl")
 
 
 
