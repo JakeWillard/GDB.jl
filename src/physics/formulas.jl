@@ -6,10 +6,14 @@ function partial_s(f, f_x, f_y, psi_x, psi_y, Ds, am)
 end
 
 
-# function partial_ss()
-#
-#     #XXX just apply partial_s twice for now to compute f_ss
-# end
+function partial_ss(f, f_x, f_y, f_xy, f_xx, f_yy, psi_x, psi_y, psi_xy, psi_xx, psi_yy, Dss, Ds, Dx, Dy, am)
+
+    _a = Dss*f + am*Ds*(psi_x.*f_y - psi_y.*f_x) + am*(psi_x.*Dy*f_s - psi_y.*Dx*f_s)
+    _b = (f_x.*psi_xy + f_xx.*psi_y - f_y.*psi_xx - psi_x.*f_xy).*psi_y
+    _c = (f_x.*psi_yy - f_y.*psi_xy - f_yy.*psi_x + psi_y.*f_xy).*psi_x
+
+    return _a + am^2 * (_b - _c)
+end
 
 
 function lnn_total_ion_derivative(phi_c, Pe_c, n, j_s, u_s, er, ev, ad)
@@ -62,21 +66,36 @@ function general_partial_derivative(f_Dt, f_x, f_y, f_s, phi_x, phi_y, v)
 end
 
 
-function w_partial_t(n, lnn_x) #XXX No dependence on lnn_xx, despite dependence on lnn_yy? Mistake?
+n: 0
+lnn: x, y, xy, xx, yy,
+Pe: x, y, xy, xx, yy, xxx, yyy, xxy, xyy, c
+phi: x, y, xy, xx, yy, yyy, xxy, xxx, xyy
+G_c, Pi_c, j_s, ad, eg
 
-    _a = n.*(lnn_x.*phi_x.*phi_xy + phi_xx.*phi_xy + phi_x.*phi_xxy)
-    _b = -n.*(lnn_x.*phi_y*phi_xx + phi_xy.*phi_xx + phi_y.*phi_xxx)
-    _c = n.*(lnn_y.*phi_x.*phi_yy + phi_xy.*phi_yy + phi_x.*phi_yyy)
-    _d = -n.*(lnn_y.*phi_y.*phi_xy + phi_yy.*phi_xy + phi_y.*phi_xyy)
-    _e = ad*(phi_xx.*Pi_xy + phi_x.*Pi_xxy - phi_xy.*Pi_xx - phi_y.*Pi_xxx)
-    _f = ad*(phi_xx.*lnn_y.*Pi_x + phi_x.*lnn_xy.*Pi_x + phi_x.*lnn_y.*Pi_xx)
-    _g = -ad*(phi_xy.*lnn_x.*Pi_x + phi_y.*lnn_xy.*Pi_x + phi_y.*lnn_x.*Pi_xx)
-    _h = ad*(phi_xy.*Pi_yy + phi_x.*Pi_yyy - phi_yy.*Pi_xy - phi_y.*Pi_xyy)
-    _i = ad*(phi_xy.*lnn_y.*Pi_y + phi_x.*lnn_yy.*Pi_y + phi_x.*lnn_y.*Pi_yy)
-    _j = -ad*(phi_yy.*lnn_x.*Pi_y + phi_y.*lnn_xy.*Pi_y + phi_y.*lnn_x.*Pi_yy)
-    _k = -eg*G_c - Pe_c - Pi_c + j_s
 
-    return +(_a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k)
+
+function w_partial_t(n, lnn_x, lnn_y, lnn_xy, lnn_xx, lnn_yy,
+                     Pe_x, Pe_y, Pe_xy, Pe_xx, Pe_yy, Pe_xxx, Pe_yyy, Pe_xxy, Pe_xyy, Pe_c,
+                     phi_x, phi_y, phi_xy, phi_xx, phi_yy, phi_xxx, phi_yyy, phi_xxy, phi_xyy,
+                     G_c, Pi_c, j_s, ad, eg)
+
+    _a = (lnn_x.*lnn_y + lnn_xy).*(Pe_y.*phi_y - Pe_x.*phi_x)
+    _b = (lnn_x.^2 + lnn_xx).*Pe_x.*phi_y - (lnn_y.^2 + lnn_yy)*Pe_y.*phi_x
+    _c = -Pe_x.*lnn_x.^2 .*phi_y + Pe_x.*lnn_x.*lnn_y.*phi_x
+    _d = Pe_x.*lnn_x.*phi_xy - Pe_x.*lnn_y.*phi_xx + Pe_xx.*lnn_x.*phi_y
+    _e = -Pe_xx.*lnn_y.*phi_x - Pe_xx.*phi_xy - Pe_xxx.*phi_y
+    _f = -Pe_y.*lnn_x.*lnn_y.*phi_y + Pe_y.*lnn_x.*phi_yy
+    _g = Pe_y.*lnn_y.^2 .*phi_x - Pe_y.*lnn_y.^phi_xy + Pe_yy.*lnn_x.*phi_y
+    _h = -Pe_yy.*lnn_y.*phi_x + Pe_yy.*phi_xy + Pe_yyy.*phi_x + phi_x.*Pe_xxy
+    _i = phi_xx.*Pe_xy - ad.*phi_y.*Pe_xyy - phi_yy.*Pe_xy
+    _j = lnn_x.*phi_x*phi_xy - lnn_x.*phi_xx.*phi_y + lnn_y.*phi_x.*phi_yy - lnn_y.*phi_y.*phi_xy
+    _k = -lnn_x.*phi_xx.*phi_y + lnn_y.*phi_x.*phi_yy - lnn_y.*phi_y.*phi_xy
+    _l = phi_x.*phi_yyy + phi_x.*phi_xxy - phi_xxx.*phi_y - phi_y.*phi_xyy
+
+    _A = ad * +(_a, _b, _c, _d, _e, _f, _g, _h, _i)
+    _B = n .* +(_j, _k, _l)
+
+    return _A + _B - eg*G_c - Pe_c - Pi_c + j_s
 end
 
 
@@ -91,7 +110,7 @@ function A_partial_t(phi_x, phi_y, phi_s, j, jn_x, jn_y, jn_s, ue, n, Te, de2, e
 end
 
 
-function compute_j_bohm(Te, Ti, n, phi, ev, ad)
+function jbohm_def(Te, Ti, n, phi, ev, ad)
 
     cs = sqrt.(Te + Ti)
     lambda = 2.695
@@ -99,13 +118,13 @@ function compute_j_bohm(Te, Ti, n, phi, ev, ad)
 end
 
 
-function compute_G(Ti, phi_c, Pi_c, u_s, er, ev, ad)
+function G_def(Ti, phi_c, Pi_c, u_s, er, ev, ad)
 
     return Ti.^(5/2) .* (er*(phi_c + ad*Pi_c) - 4*ev*u_s)
 end
 
 
-function compute_ue(u, jn, ev)
+function ue_def(u, jn, ev)
 
     return u - jn / ev
 end
