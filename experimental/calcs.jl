@@ -1,42 +1,140 @@
 
+struct TimestepConstants
 
-function lnn_forward_euler(lnn, lnn_t, Sn, P0, P1, LAM, dt)
+    Dx :: SparseMatrixCSC
+    Dy :: SparseMatrixCSC
+    Dxy :: SparseMatrixCSC
+    Dxx :: SparseMatrixCSC
+    Dyy :: SparseMatrixCSC
+    Dxxx :: SparseMatrixCSC
+    Dyyy :: SparseMatrixCSC
+    Dxxy :: SparseMatrixCSC
+    Dxyy :: SparseMatrixCSC
+    Ds :: SparseMatrixCSC
+    Dss :: SparseMatrixCSC
+    DIFF_lnn :: LinearLeftHandSide
+    DIFF_lnTe :: LinearLeftHandSide
+    DIFF_lnTi :: LinearLeftHandSide
+    DIFF_u :: LinearLeftHandSide
+    DIFF_w :: LinearLeftHandSide
+    DIFF_A :: LinearLeftHandSide
+    HHOLTZ :: LinearLeftHandSide
+    P0 :: SparseMatrixCSC
+    P1 :: SparseMatrixCSC
+    P2 :: SparseMatrixCSC
+    P3 :: SparseMatrixCSC
+    R1 :: SparseMatrixCSC
+    R2 :: SparseMatrixCSC
+    R3 :: SparseMatrixCSC
+    LAM :: SparseMatrixCSC
+    DCHLT1 :: SparseMatrixCSC
+    DCHLT2 :: SparseMatrixCSC
+    DCHLT3 :: SparseMatrixCSC
+    NMANN1 :: SparseMatrixCSC
+    NMANN2 :: SparseMatrixCSC
+    NMANN3 :: SparseMatrixCSC
+    Sn :: Vector{Float64}
+    STe :: Vector{Float64}
+    STi :: Vector{Float64}
+    dt :: Float64
+    N_subcycle :: Int64
 
-    return LAM*(lnn + dt*(P0*lnn_t + P1*Sn)) ./ lamt
 end
 
 
-function lnTe_forward_euler(lnTe, lnTe_t, STe, P0, P1, LAM, dt)
+function lnn_forward_euler(lnn, lnn_t, tsc::TimestepConstants)
 
-    return LAM*(lnTe + dt*(P0*lnTe_t + P1*STe))
+    return tsc.LAM*(lnn + tsc.dt*(tsc.P0*lnn_t + tsc.P1*tcs.Sn))
 end
 
 
-function lnTi_forward_euler(lnTi, lnTi_t, Sn, P0, P1, LAM, dt)
+function lnTe_forward_euler(lnTe, lnTe_t, tsc::TimestepConstants)
 
-    return LAM*(lnTi + dt*(P0*lnTi_t + P1*STi))
+    return tsc.LAM*(lnTe + tsc.dt*(tsc.P0*lnTe_t + tsc.P1*tcs.STe))
 end
 
 
-function u_forward_euler(u, u_t, Te, Ti, P0, P3, LAM, dt)
+function lnTi_forward_euler(lnTi, lnTi_t, tsc::TimestepConstants)
+
+    return tsc.LAM*(lnTi + tsc.dt*(tsc.P0*lnTi_t + tsc.P1*tcs.STi))
+end
+
+
+function u_forward_euler(u, u_t, Te, Ti, tsc::TimestepConstants)
 
     cs = sqrt.(Te + Ti)
-    return LAM*(u + dt*(P0*u_t + P3*cs))
+    return tsc.LAM*(u + tcs.dt*(tsc.P0*u_t + tcs.P3*cs))
 end
 
 
-function w_forward_euler(w, w_t, P0, LAM, dt)
+function w_forward_euler(w, w_t, tsc::TimestepConstants)
 
-    return LAM*(w + dt*P0*w_t)
+    return tcs.LAM*(w + tcs.dt*tcs.P0*w_t)
 end
 
 
-function A_forward_euler(A, A_t, Te, Ti, n, phi, ev, ad, de2, P0, P3, LAM, dt)
+function A_forward_euler(A, A_t, Te, Ti, n, phi, ev, ad, de2, tsc::TimestepConstants)
 
     Abohm = Abohm_def(Te, Ti, n, phi, ev, ad, de2)
 
-    return LAM*(A + dt*(P0*A_T + P3*Abohm))
+    return tcs.LAM*(A + tcs.dt*(tcs.P0*A_T + tcs.P3*Abohm))
 end
+
+
+function diffusion_lnn(lnn, tcs::TimestepConstants)
+
+    rhs = tcs.P0 * lnn
+    return jacobi_preconditiond_gmres(tcs.DIFF_lnn, lnn, rhs)
+end
+
+
+function diffusion_lnTe(lnTe, tcs::TimestepConstants)
+
+    rhs = tcs.P0 * lnTe
+    return jacobi_preconditiond_gmres(tcs.DIFF_lnTe, lnTe, rhs)
+end
+
+
+function diffusion_lnTi(lnTi, tcs::TimestepConstants)
+
+    rhs = tcs.P0 * lnTi
+    return jacobi_preconditiond_gmres(tcs.DIFF_lnTi, lnTi, rhs)
+end
+
+
+function diffusion_u(u, Te, Ti, tcs::TimestepConstants)
+
+    cs = sqrt.(Te + Ti)
+    rhs = tcs.P0 * u + tcs.DCHLT3*cs
+    return jacobi_preconditiond_gmres(tcs.DIFF_u, u, rhs)
+end
+
+
+function diffusion_w(w, tcs::TimestepConstants)
+
+    rhs = tcs.P0 * w
+    return jacobi_preconditiond_gmres(tcs.DIFF_w, w, rhs)
+end
+
+
+function diffusion_A(A, Te, Ti, n, phi, ev, ad, de2, tcs::TimestepConstants)
+
+    Abohm = Abohm_def(Te, Ti, n, phi, ev, ad, de2)
+    rhs = tcs.P0 * A + tcs.DCHLT3*Abohm
+    return jacobi_preconditiond_gmres(tcs.DIFF_A, A, rhs)
+end
+
+
+function vorticity_eqn(phi, w, Pi_xx, Pi_yy, Te, n, lnn_x, lnn_y, phi_b, ad, tcs::TimestepConstants)
+
+    M = Diagonal(n) * (tcs.Dxx + tcs.Dyy + Diagonal(lnn_x)*tcs.Dx + Diagonal(lnn_y)*tcs.Dy)
+    LHS = LinearLeftHandSide(tcs.P0*M + tcs.DCHLT1 + tcs.DCHLT2 + tcs.DCHLT3)
+
+    lambda = 2.695
+    rhs0 = w - ad*(Pi_xx + Pi_yy)
+    rhs = tcs.P0*rhs0 + tcs.DCHLT1*phi_b + lambda*(tcs.DCHLT2*Te + tcs.DCHLT3*Te)
+
+    return jacobi_preconditiond_gmres(LHS, phi, rhs)
 
 
 function adiabatic_leapfrog!()
@@ -137,6 +235,18 @@ function adiabatic_leapfrog!()
     A[:,3] = A_forward_euler(0.5*(A[:,1] + A[:,2]), A_t, Te, Ti, n, phi, ev, ad, de2, P0, P3, LAM, dt)
 
     # solve linear problems
+    lnn[:,3] = diffusion_lnn()
+    lnTe[:,3] = diffusion_lnTe()
+    lnTi[:,3] = diffusion_lnTi()
+    u[:,3] = diffusion_u()
+    w[:,3] = diffusion_w()
+    phi = vorticity_eqn()
+    psi = helmholtz_eqn()
+    n = exp.(lnn[:,3])
+    Te = exp.(lnTe[:,3])
+    Ti = exp.(lnTi[:,3])
+    j = (Dxx + Dyy) * psi
+    jn = j ./ n 
 
     # take derivatives again
     # XXX
