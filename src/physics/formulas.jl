@@ -66,13 +66,6 @@ function general_partial_derivative(f_Dt, f_x, f_y, f_s, phi_x, phi_y, v)
 end
 
 
-n: 0
-lnn: x, y, xy, xx, yy,
-Pe: x, y, xy, xx, yy, xxx, yyy, xxy, xyy, c
-phi: x, y, xy, xx, yy, yyy, xxy, xxx, xyy
-G_c, Pi_c, j_s, ad, eg
-
-
 
 function w_partial_t(n, lnn_x, lnn_y, lnn_xy, lnn_xx, lnn_yy,
                      Pe_x, Pe_y, Pe_xy, Pe_xx, Pe_yy, Pe_xxx, Pe_yyy, Pe_xxy, Pe_xyy, Pe_c,
@@ -99,10 +92,10 @@ function w_partial_t(n, lnn_x, lnn_y, lnn_xy, lnn_xx, lnn_yy,
 end
 
 
-function A_partial_t(phi_x, phi_y, phi_s, j, jn_x, jn_y, jn_s, ue, n, Te, de2, ev, ad, am, eta)
+function A_partial_t(phi_x, phi_y, phi_s, j, jn, jn_x, jn_y, jn_s, u, n, Te, de2, ev, ad, am, eta)
 
     _a = de2 * (phi_x .* jn_y - phi_y .* jn_x)
-    _b = de2 * ue.*jn_s / ev
+    _b = de2 * (u - jn / ev).*jn_s / ev
     _c = (phi_s - ad*Pe_s ./ n) / am
     _d = eta*(j ./ Te.^(3/2))
 
@@ -110,23 +103,19 @@ function A_partial_t(phi_x, phi_y, phi_s, j, jn_x, jn_y, jn_s, ue, n, Te, de2, e
 end
 
 
-function jbohm_def(Te, Ti, n, phi, ev, ad)
+function Abohm_def(Te, Ti, n, phi, ev, ad, de2)
 
     cs = sqrt.(Te + Ti)
     lambda = 2.695
-    return ev * n.*cs.*(1 .- exp.(lambda .- phi ./(ad*Te)))
+    jbohm = ev * n.*cs.*(1 .- exp.(lambda .- phi ./(ad*Te)))
+
+    return -de2*jbohm
 end
 
 
 function G_def(Ti, phi_c, Pi_c, u_s, er, ev, ad)
 
     return Ti.^(5/2) .* (er*(phi_c + ad*Pi_c) - 4*ev*u_s)
-end
-
-
-function ue_def(u, jn, ev)
-
-    return u - jn / ev
 end
 
 
@@ -213,18 +202,6 @@ function diffusion_A_rhs()
     return P0*A + 0.5*P3*(I + R3)*Abohm
 end
 
-
-function penalized_forward_euler(f, f_t, dt, p0, p1, p2, p3, q1, q2, q3)
-
-    c1 = p1 / q1
-    c2 = p2 / q2
-    c3 = p3 / q3
-
-    _a = 1 .+ dt*(c1 + c2 + c3)
-    _b = +(p0.*f_t, c1.*f1, c2.*f2, c3.*f3)
-
-    return (f + dt*_b) ./ _a
-end
 
 
 
