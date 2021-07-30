@@ -50,7 +50,7 @@ function lnT_partial_thermal(lnT_s, lnT_ss, T, n, k)
 end
 
 
-function u_total_ion_derivative(Pe_s, Pi_s, n, G_s, n, Ti, u_c, ev, eg, er, ad)
+function u_total_ion_derivative(Pe_s, Pi_s, G_s, n, Ti, u_c, ev, eg, er, ad)
 
     _a = -ev*(Pe_s + Pi_s) ./ n
     _b = -4*ev*eg*G_s ./ n
