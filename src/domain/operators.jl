@@ -63,7 +63,7 @@ function reflection_matrix(delta, mx, my, MinvT, bar::Barrier, grd::Grid)
 end
 
 
-function boundary_operators(deltas::Vector{Float64}, bars::Vector{Barrier}, grd::Grid)
+function boundary_operators(deltas::Vector{Float64}, bars::Vector{Barrier}, qs::Vector{Float64}, grd::Grid)
 
     Nk = size(grd.points)[2]
     Nb = length(bars)
@@ -76,7 +76,7 @@ function boundary_operators(deltas::Vector{Float64}, bars::Vector{Barrier}, grd:
     for i=1:Nb
         P = Diagonal(f_to_vec((x,y)-> smoothstep(x, y, delta[i], bars[i]), grd))
         PEN = P .* ops
-        append!(ops, [I - P])
+        append!(ops, [(I - P)/qs[i]])
     end
 
     for i=1:Nb
