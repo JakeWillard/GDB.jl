@@ -63,26 +63,28 @@ function reflection_matrix(delta, mx, my, MinvT, bar::Barrier, grd::Grid)
 end
 
 
-function penalization_operators(deltas::Vector{Float64}, bars::Vector{Barrier}, grd::Grid)
+function boundary_operators(deltas::Vector{Float64}, bars::Vector{Barrier}, grd::Grid)
 
     Nk = size(grd.points)[2]
     Nb = length(bars)
 
     PEN = SparseMatrixCSC[sparse(I, Nk, Nk)]
+    REF = SparseMatrixCSC[]
     DCHLT = SparseMatrixCSC[]
     NMANN = SparseMatrixCSC[]
 
     for i=1:Nb
         P = Diagonal(f_to_vec((x,y)-> smoothstep(x, y, delta[i], bars[i]), grd))
         PEN = P .* ops
-        append!(ops, (I - P))
+        append!(ops, [I - P])
     end
 
     for i=1:Nb
         R = reflection_matrix(deltas[i], mx, my, MinvT, bars[i], grd)
-        append!(DCHLT, 0.5*(I + R))
-        append!(NMANN, 0.5*(I - R))
+        append!(REF, [R])
+        append!(DCHLT, [0.5*(I + R)])
+        append!(NMANN, [0.5*(I - R)])
     end
 
-    return PEN, PEN[2:end] .* DCHLT, PEN[2:end] .* NMANN
+    return PEN, REF, PEN[2:end] .* DCHLT, PEN[2:end] .* NMANN
 end
