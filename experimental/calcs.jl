@@ -33,7 +33,8 @@ struct Workspace
     NMANN1 :: SparseMatrixCSC
     NMANN2 :: SparseMatrixCSC
     NMANN3 :: SparseMatrixCSC
-    FLXAVG :: SparseVectorCSC
+    FLXAVG :: SparseVector
+    TRGT :: Vector{Float64}
     Sn :: Vector{Float64}
     STe :: Vector{Float64}
     STi :: Vector{Float64}
@@ -64,7 +65,7 @@ end
 
 function u_forward_euler(u, u_t, Te, Ti, wrk::Workspace)
 
-    cs = sqrt.(Te + Ti)
+    cs = wrk.TRGT .* sqrt.(Te + Ti)
     return wrk.LAM*(u + wrk.dt*(wrk.P0*u_t + wrk.P3*cs))
 end
 
@@ -77,7 +78,7 @@ end
 
 function A_forward_euler(A, A_t, Te, Ti, n, phi, ev, ad, de2, wrk::Workspace)
 
-    Abohm = Abohm_def(Te, Ti, n, phi, ev, ad, de2)
+    Abohm = wrk.TRGT .* Abohm_def(Te, Ti, n, phi, ev, ad, de2)
 
     return wrk.LAM*(A + wrk.dt*(wrk.P0*A_T + wrk.P3*Abohm))
 end
@@ -106,7 +107,7 @@ end
 
 function diffusion_u(u, Te, Ti, wrk::Workspace)
 
-    cs = sqrt.(Te + Ti)
+    cs = wrk.TRGT .* sqrt.(Te + Ti)
     rhs = wrk.P0 * u + wrk.DCHLT3*cs
     return jacobi_preconditioned_gmres(wrk.DIFF_u, u, rhs)
 end
@@ -121,7 +122,7 @@ end
 
 function diffusion_A(A, Te, Ti, n, phi, ev, ad, de2, wrk::Workspace)
 
-    Abohm = Abohm_def(Te, Ti, n, phi, ev, ad, de2)
+    Abohm = wrk.TRGT .* Abohm_def(Te, Ti, n, phi, ev, ad, de2)
     rhs = wrk.P0 * A + wrk.DCHLT3*Abohm
     return jacobi_preconditioned_gmres(wrk.DIFF_A, A, rhs)
 end

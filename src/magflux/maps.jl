@@ -16,13 +16,13 @@ function fieldline_map_matrix(bx::Function, by::Function, bz::Function, ds::Floa
         return hcat(row_dat, row_js, dS_vec)
     end
 
-    M = grid_map(f, (grd.mx*grd.my,3), grd)
-    dS = M[1:grd.mx*grd.my:end,3]
+    M = grid_map(f, (mx*my,3), grd)
+    dS = M[1:mx*my:end,3]
     dat = M[:,1]
     js = Int64[M[:,2]...]
-    is = vcat([k*ones(Int64, grd.mx*grd.my) for k=1:Nk]...)
+    is = vcat([k*ones(Int64, mx*my) for k=1:size(grd.points)[2]]...)
 
-    matrix = sparse(is, js, dat, Nk, grd._Nx*grd._Ny) * transpose(grd.Proj)
+    matrix = sparse(is, js, dat, size(grd.points)[2], grd._Nx*grd._Ny) * transpose(grd.Proj)
     return matrix, dS
 end
 
@@ -42,9 +42,11 @@ function fieldline_derivatives(bx::Function, by::Function, bz::Function, ds::Flo
     _F = Diagonal(1 ./ (dS1.^2 + dS1.*dS2))
 
     # make off diagonal matrices for kronecker product
-    Ia = spdiag(-1 => ones(Float64, Nz-1))
+    Ia = spdiagm(-1 => ones(Float64, Nz-1))
+    Ia[1,end] = -1
     Ib = sparse(I, Nz, Nz)
-    Ic = spdiag(1 => ones(Float64, Nz-1))
+    Ic = spdiagm(1 => ones(Float64, Nz-1))
+    Ic[end,1] = 1
 
     # construct derivative matrices
     Ds = kron(Ia, _A*BM) + kron(Ib, _B) + kron(Ic, _C*FM)

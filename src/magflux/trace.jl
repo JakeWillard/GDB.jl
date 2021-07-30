@@ -53,7 +53,7 @@ function trace_fieldline(x0, y0, bx, by, bz, ds, deltaPhi)
     z = 0
     deltaS = 0
 
-    while z < deltaPhi
+    while abs(z) < deltaPhi
         x, y, z = rk4_step_3d(x, y, z, bx, by, bz, ds)
         deltaS += ds
     end

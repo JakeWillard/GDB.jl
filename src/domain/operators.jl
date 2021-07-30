@@ -51,19 +51,19 @@ function reflection_matrix(delta, mx, my, MinvT, bar::Barrier, grd::Grid)
     function f(x, y, grd)
         x, y = reflection(x, y, delta, bar)
         row_dat, row_js = interpolation_row(x, y, mx, my, MinvT, grd)
-        return hcat(row_dat, row_js, dS_vec)
+        return hcat(row_dat, row_js)
     end
 
-    M = grid_map(f, (grd.mx*grd.my,2), grd)
+    M = grid_map(f, (mx*my,2), grd)
     dat = M[:,1]
     js = Int64[M[:,2]...]
-    is = vcat([k*ones(Int64, grd.mx*grd.my) for k=1:Nk]...)
+    is = vcat([k*ones(Int64, mx*my) for k=1:size(grd.points)[2]]...)
 
-    return sparse(is, js, dat, Nk, grd._Nx*grd._Ny) * transpose(grd.Proj)
+    return sparse(is, js, dat, size(grd.points)[2], grd._Nx*grd._Ny) * transpose(grd.Proj)
 end
 
 
-function boundary_operators(deltas::Vector{Float64}, bars::Vector{Barrier}, qs::Vector{Float64}, grd::Grid)
+function boundary_operators(mx, my, MinvT, deltas::Vector{Float64}, bars::Vector{Barrier}, qs::Vector{Float64}, grd::Grid)
 
     Nk = size(grd.points)[2]
     Nb = length(bars)
@@ -74,17 +74,23 @@ function boundary_operators(deltas::Vector{Float64}, bars::Vector{Barrier}, qs::
     NMANN = SparseMatrixCSC[]
 
     for i=1:Nb
-        P = Diagonal(f_to_vec((x,y)-> smoothstep(x, y, delta[i], bars[i]), grd))
-        PEN = P .* ops
-        append!(ops, [(I - P)/qs[i]])
+        P = Diagonal(f_to_grid((x,y)-> smoothstep(x, y, deltas[i], bars[i]), grd))
+        for j=1:length(PEN)
+            PEN[j] = P * PEN[j]
+        end
+        append!(PEN, [(I - P)/qs[i]])
     end
+
+    println("computed pens")
 
     for i=1:Nb
         R = reflection_matrix(deltas[i], mx, my, MinvT, bars[i], grd)
         append!(REF, [R])
-        append!(DCHLT, [0.5*(I + R)])
-        append!(NMANN, [0.5*(I - R)])
+        append!(DCHLT, [0.5*PEN[i+1]*(I + R)])
+        append!(NMANN, [0.5*PEN[i+1]*(I - R)])
     end
 
-    return PEN, REF, PEN[2:end] .* DCHLT, PEN[2:end] .* NMANN
+    println("computed everything")
+
+    return PEN, REF, DCHLT, NMANN
 end

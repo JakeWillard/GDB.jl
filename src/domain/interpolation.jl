@@ -36,7 +36,7 @@ end
 
 function interpolation_row(x, y, mx, my, MinvT, grd::Grid)
 
-    x0, y0 = r0
+    x0, y0 = grd.r0
     dx = grd.dx
     dy = grd.dy
     Nx = grd._Nx

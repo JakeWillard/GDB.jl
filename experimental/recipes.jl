@@ -17,7 +17,7 @@ end
 @recipe function f(pg::PlotGrid)
 
     grd, clr = pg.args
-    z = vec_to_mesh(ones(Float64, grd.Nk), grd)
+    z = vec_to_mesh(ones(Float64, size(grd.points)[2]), grd)
     seriestype := :heatmap
     fillcolor := clr
     colorbar := false

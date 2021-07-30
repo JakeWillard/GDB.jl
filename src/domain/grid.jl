@@ -35,8 +35,8 @@ function Grid(is_inside::Function, r0::Vector{Float64}, r1::Vector{Float64}, Nx,
             y = r0[2] + (j-1)*dx
             if is_inside(x, y)
                 k += 1
-                points[:,Nk] = [x, y]
-                proj_cols[Nk] = i + Nx*(j-1)
+                points[:,k] = [x, y]
+                proj_cols[k] = i + Nx*(j-1)
                 _nan_outside_boundaries[i,j] = 1.0
             end
 
@@ -44,7 +44,7 @@ function Grid(is_inside::Function, r0::Vector{Float64}, r1::Vector{Float64}, Nx,
     end
 
     Proj = sparse(proj_rows[1:k], proj_cols[1:k], proj_vals[1:k], k, Nx*Ny)
-    return Grid(r0, points, Proj, dx, dy, Nx, Ny, _nan_outside_boundaries)
+    return Grid(r0, points[:,1:k], Proj, dx, dy, Nx, Ny, _nan_outside_boundaries)
 end
 
 
@@ -62,7 +62,7 @@ function vec_to_mesh(vec, grd::Grid)
         out[:,j] = vals[1+(j-1)*Nx:j*Nx]
     end
 
-    return out .* grid._nan_outside_boundaries
+    return out .* grd._nan_outside_boundaries
 end
 
 
