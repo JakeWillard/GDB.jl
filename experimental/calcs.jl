@@ -37,6 +37,7 @@ struct Workspace
     Sn :: Vector{Float64}
     STe :: Vector{Float64}
     STi :: Vector{Float64}
+    params :: Vector{Float64}
     dt :: Float64
     N_subcycle :: Int64
 
@@ -146,7 +147,76 @@ function helmholtz_eqn(psi, wrk::Workspace)
 end
 
 
-function adiabatic_leapfrog!(wrk::Workspace)
+function leapfrog!(lnn, lnTe, lnTi, u, w, phi, psi, n, Te, Ti, Pe, Pi, j, jn, wrk::Workspace)
+
+    # unpack physical parameters
+    am, ad, ki, ke, er, eg, ev, de2, eta = wrk.params
+
+    # subcycle electron thermal conduction terms
+    lnTe0 = lnTe[:,2]
+    for _=1:wrk.N_subcycle
+
+        # derivatives
+        lnTe_x = wrk.Dx*lnTe[:,2]
+        lnTe_y = wrk.Dy*lnTe[:,2]
+        lnTe_xy = wrk.Dxy*lnTe[:,2]
+        lnTe_xx = wrk.Dxx*lnTe[:,2]
+        lnTe_yy = wrk.Dyy*lnTe[:,2]
+        lnTe_s = partial_s(lnTe[:,2], lnTe_x, lnTe_y, psi_x, psi_y, wrk.Ds, am)
+        lnTe_ss = partial_ss(lnTe[:,2], lnTe_x, lnTe_y, lnTe_xy, lnTe_xx, lnTe_yy, psi_x, psi_y, psi_xy, psi_xx, psi_yy, wrk.Dss, wrk.Ds, wrk.Dx, wrk.Dy, am)
+
+        lnTe_t = lnT_partial_thermal(lnTe_s, lnTe_ss, Te, n, ke)
+        lnTe[:,3] = wrk.LAM *(0.5*(lnTe[:,1] + lnTe[:,2]) + wrk.dt*(wrk.P0*lnTe_t + wrk.P1*wrk.STe)/wrk.N_subcycle)
+
+        # derivatives again
+        lnTe_x = wrk.Dx*lnTe[:,2]
+        lnTe_y = wrk.Dy*lnTe[:,2]
+        lnTe_xy = wrk.Dxy*lnTe[:,2]
+        lnTe_xx = wrk.Dxx*lnTe[:,2]
+        lnTe_yy = wrk.Dyy*lnTe[:,2]
+        lnTe_s = partial_s(lnTe[:,2], lnTe_x, lnTe_y, psi_x, psi_y, wrk.Ds, am)
+        lnTe_ss = partial_ss(lnTe[:,2], lnTe_x, lnTe_y, lnTe_xy, lnTe_xx, lnTe_yy, psi_x, psi_y, psi_xy, psi_xx, psi_yy, wrk.Dss, wrk.Ds, wrk.Dx, wrk.Dy, am)
+
+        lnTe_t = lnT_partial_thermal(lnTe_s, lnTe_ss, Te, n, ke)
+        lnTe[:,3] = wrk.LAM *(lnTe[:,2] + wrk.dt*(wrk.P0*lnTe_t + wrk.P1*wrk.STe)/wrk.N_subcycle)
+
+        # shift indices
+        lnTe[:,1:2] = lnTe[:,2:3]
+    end
+    lnTe[:,2] = 0.5*(lnTe0 + lnTe[:,2])
+
+    # subcycle ion thermal conduction terms
+    lnTi0 = lnTi[:,2]
+    for _=1:wrk.N_subcycle
+
+        # derivatives
+        lnTi_x = wrk.Dx*lnTi[:,2]
+        lnTi_y = wrk.Dy*lnTi[:,2]
+        lnTi_xy = wrk.Dxy*lnTi[:,2]
+        lnTi_xx = wrk.Dxx*lnTi[:,2]
+        lnTi_yy = wrk.Dyy*lnTi[:,2]
+        lnTi_s = partial_s(lnTi[:,2], lnTi_x, lnTi_y, psi_x, psi_y, wrk.Ds, am)
+        lnTi_ss = partial_ss(lnTi[:,2], lnTi_x, lnTi_y, lnTi_xy, lnTi_xx, lnTi_yy, psi_x, psi_y, psi_xy, psi_xx, psi_yy, wrk.Dss, wrk.Ds, wrk.Dx, wrk.Dy, am)
+
+        lnTi_t = lnT_partial_thermal(lnTi_s, lnTi_ss, Te, n, ke)
+        lnTi[:,3] = wrk.LAM *(0.5*(lnTi[:,1] + lnTi[:,2]) + wrk.dt*(wrk.P0*lnTi_t + wrk.P1*wrk.STe)/wrk.N_subcycle)
+
+        # derivatives again
+        lnTi_x = wrk.Dx*lnTi[:,2]
+        lnTi_y = wrk.Dy*lnTi[:,2]
+        lnTi_xy = wrk.Dxy*lnTi[:,2]
+        lnTi_xx = wrk.Dxx*lnTi[:,2]
+        lnTi_yy = wrk.Dyy*lnTi[:,2]
+        lnTi_s = partial_s(lnTi[:,2], lnTi_x, lnTi_y, psi_x, psi_y, wrk.Ds, am)
+        lnTi_ss = partial_ss(lnTi[:,2], lnTi_x, lnTi_y, lnTi_xy, lnTi_xx, lnTi_yy, psi_x, psi_y, psi_xy, psi_xx, psi_yy, wrk.Dss, wrk.Ds, wrk.Dx, wrk.Dy, am)
+
+        lnTi_t = lnT_partial_thermal(lnTi_s, lnTi_ss, Te, n, ke)
+        lnTi[:,3] = wrk.LAM *(lnTi[:,2] + wrk.dt*(wrk.P0*lnTi_t + wrk.P1*wrk.STe)/wrk.N_subcycle)
+
+        # shift indices
+        lnTi[:,1:2] = lnTi[:,2:3]
+    end
+    lnTi[:,2] = 0.5*(lnTi0 + lnTi[:,2])
 
     # take derivatives
     psi_x = wrk.Dx*psi
