@@ -1,6 +1,7 @@
 
 struct Workspace
 
+    GRID :: Grid
     Dx :: SparseMatrixCSC
     Dy :: SparseMatrixCSC
     Dxy :: SparseMatrixCSC
