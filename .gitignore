@@ -2,6 +2,7 @@
 *.jl.cov
 *.jl.mem
 /Manifest.toml
+/dev.jl
 /src/dev.jl
 /src/devtools.jl
 *.h5

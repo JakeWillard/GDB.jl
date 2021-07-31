@@ -56,29 +56,29 @@ function rectangle_workspace(Nx, Nz, q, a, R0, k, n0, T0, B0, dt)
     println("generated field-line derivatives")
 
     # generate boundary operators
-    smallerdeltas = Float64[0.1, 0.1, 0.1]
+    smallerdeltas = Float64[-0.1, 0.1, -0.1]
     qs = Float64[10, 10, 10]
     PENs, REFs, DCHLTs, NMANNs = boundary_operators(m, m, MinvT, smallerdeltas, bars, qs, grd)
-    P0, P1, P2, P3 = PENS
-    R1, R2, R3 = REFs
-    DCHLT1, DCHLT2, DCHLT3 = DCHLTs
-    NMANN1, NMANN2, NMANN3 = NMANN
+    P0, P1, P2, P3 = [kron(Iz, P) for P in PENs]
+    R1, R2, R3 = [kron(Iz, R) for R in REFs]
+    DCHLT1, DCHLT2, DCHLT3 = [kron(Iz, D) for D in DCHLTs]
+    NMANN1, NMANN2, NMANN3 = [kron(Iz, N) for N in NMANNs]
 
     println("generated boundary operators")
 
     # compute LAM matrix
-    LAM = inv(I + dt*(P1 + P2 + P3))
+    LAM = Diagonal(1 ./ (1 .+ dt*diag(P1 + P2 + P3)))
 
     println("computed LAM")
 
     # setup diffusion problems with diffusion constant k
     L = I - k*(Dxx + Dyy)
-    DIFF_lnn = LinearLeftHandSide(P0*L + NMANN1 + NMANN2 + NMANN3)
-    DIFF_lnTe = LinearLeftHandSide(P0*L + NMANN1 + NMANN2 + NMANN3)
-    DIFF_lnTi = LinearLeftHandSide(P0*L + NMANN1 + NMANN2 + NMANN3)
-    DIFF_u = LinearLeftHandSide(P0*L + NMANN1 + NMANN2 + DCHLT3)
-    DIFF_w = LinearLeftHandSide(P0*L + DCHLT1 + DCHLT2 + DCHLT3)
-    DIFF_A = LinearLeftHandSide(P0*L + DCHLT1 + DCHLT2 + DCHLT3)
+    DIFF_lnn = LinearLeftHandSide(P0*L + NMANN1 + NMANN2 + NMANN3, 2/3)
+    DIFF_lnTe = LinearLeftHandSide(P0*L + NMANN1 + NMANN2 + NMANN3, 2/3)
+    DIFF_lnTi = LinearLeftHandSide(P0*L + NMANN1 + NMANN2 + NMANN3, 2/3)
+    DIFF_u = LinearLeftHandSide(P0*L + NMANN1 + NMANN2 + DCHLT3, 2/3)
+    DIFF_w = LinearLeftHandSide(P0*L + DCHLT1 + DCHLT2 + DCHLT3, 2/3)
+    DIFF_A = LinearLeftHandSide(P0*L + DCHLT1 + DCHLT2 + DCHLT3, 2/3)
 
     # compute parameters
     params = dimensionless_parameters(a, R0, n0, T0, B0)
@@ -86,18 +86,18 @@ function rectangle_workspace(Nx, Nz, q, a, R0, k, n0, T0, B0, dt)
     # setup helmoltz problem
     de2 = params[8]
     Lhelm = I - de2*(Dxx + Dyy)
-    HHOLTZ = LinearLeftHandSide(P0*Lhelm + DCHLT1 + DCHLT2 + DCHLT3)
+    HHOLTZ = LinearLeftHandSide(P0*Lhelm + DCHLT1 + DCHLT2 + DCHLT3, 2/3)
 
     println("setup linear problems")
 
     # compute FLXAVG, from middle flux surface
-    flxpoints = hcat([Float64[x, 0.5] for x in LinRange(0, 1, 15)])
-    rows = SparseVector[]
+    flxpoints = hcat([Float64[x, 0.5] for x in LinRange(0, 1, 15)]...)
+    rows = SparseMatrixCSC[]
     for i=1:15
         dat, js = interpolation_row(flxpoints[:,i]..., m, m, MinvT, grd)
         is = ones(Int64, length(js))
-        row = sparse(is, js, dat, 1, grd._Nx*grd.Ny) * transpose(grd.Proj)
-        append!(rows, [SparseVector(row)])
+        row = sparse(is, js, dat, 1, grd._Nx*grd._Ny) * transpose(grd.Proj)
+        append!(rows, [row])
     end
     FLXAVG = +(rows...) / 15
 
@@ -109,7 +109,7 @@ function rectangle_workspace(Nx, Nz, q, a, R0, k, n0, T0, B0, dt)
     # define source terms
     Sn = f_to_grid((x,y) -> 1/(100*dt), grd)
     STe = f_to_grid((x,y) -> 1/(100*dt), grd)
-    Sn = f_to_grid((x,y) -> 1/(100*dt), grd)
+    STi = f_to_grid((x,y) -> 1/(100*dt), grd)
 
     println("computed source terms")
 

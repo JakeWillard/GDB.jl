@@ -33,7 +33,7 @@ struct Workspace
     NMANN1 :: SparseMatrixCSC
     NMANN2 :: SparseMatrixCSC
     NMANN3 :: SparseMatrixCSC
-    FLXAVG :: SparseVector
+    FLXAVG :: SparseMatrixCSC
     TRGT :: Vector{Float64}
     Sn :: Vector{Float64}
     STe :: Vector{Float64}

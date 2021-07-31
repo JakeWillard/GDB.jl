@@ -81,16 +81,12 @@ function boundary_operators(mx, my, MinvT, deltas::Vector{Float64}, bars::Vector
         append!(PEN, [(I - P)/qs[i]])
     end
 
-    println("computed pens")
-
     for i=1:Nb
         R = reflection_matrix(deltas[i], mx, my, MinvT, bars[i], grd)
         append!(REF, [R])
         append!(DCHLT, [0.5*PEN[i+1]*(I + R)])
         append!(NMANN, [0.5*PEN[i+1]*(I - R)])
     end
-
-    println("computed everything")
 
     return PEN, REF, DCHLT, NMANN
 end

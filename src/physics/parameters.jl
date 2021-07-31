@@ -39,13 +39,13 @@ function dimensionless_parameters(a, R0, n0, T0, B0)
 
     # parameters for gdb model
     am = R0*beta0/a
-    ad = cs0^2 * t0 / (omega_ci*a^2)
-    ki = 2*3.9*t0*tau_i*Ti0 / (R0^2 * mi)
-    ke = 2*3.2*t0*tau_e*Te0 / (R0^2 * me)
+    ad = cs0^2 * t0 / (wci*a^2)
+    ki = 2*3.9*t0*tau_i*T0 / (R0^2 * mi)
+    ke = 2*3.2*t0*tau_e*T0 / (R0^2 * me)
     er = 2*a/R0
     eg = 0.08*tau_i / t0
     ev = cs0*t0/R0
-    de2 = c / (a*omega_pe0)
+    de2 = c / (a*wpe)
     eta = 0.51*t0*de2 / tau_e
 
     return Float64[am, ad, ki, ke, er, eg, ev, de2, eta]
