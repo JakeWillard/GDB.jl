@@ -149,7 +149,7 @@ function helmholtz_eqn(psi, wrk::Workspace)
 end
 
 
-function leapfrog!(lnn, lnTe, lnTi, u, w, phi, psi, n, Te, Ti, Pe, Pi, j, jn, wrk::Workspace)
+function leapfrog!(lnn, lnTe, lnTi, u, w, A, phi, psi, n, Te, Ti, Pe, Pi, j, jn, wrk::Workspace)
 
     # unpack physical parameters
     am, ad, ki, ke, er, eg, ev, de2, eta = wrk.params
