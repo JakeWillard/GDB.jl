@@ -42,7 +42,7 @@ function derivative_matrix(nx, ny, Mxinv, Myinv, grd::Grid)
     Pinv = transpose(grd.Proj)
     D2d = P * D * Pinv / ((grd.dx)^nx *(grd.dy)^ny)
 
-    return kron(sparse(I, grd.Nz, grd.nz), D2d)
+    return kron(sparse(I, grd.Nz, grd.Nz), D2d)
 end
 
 

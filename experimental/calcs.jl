@@ -88,21 +88,21 @@ end
 function diffusion_lnn(lnn, wrk::Workspace)
 
     rhs = wrk.P0 * lnn
-    return jacobi_preconditioned_gmres(wrk.DIFF_lnn, lnn, rhs)
+    return parallel_jacobi_preconditioned_gmres(wrk.DIFF_lnn, lnn, rhs, 1, wrk.GRID.Nz)
 end
 
 
 function diffusion_lnTe(lnTe, wrk::Workspace)
 
     rhs = wrk.P0 * lnTe
-    return jacobi_preconditioned_gmres(wrk.DIFF_lnTe, lnTe, rhs)
+    return parallel_jacobi_preconditioned_gmres(wrk.DIFF_lnTe, lnTe, rhs, 1, wrk.GRID.Nz)
 end
 
 
 function diffusion_lnTi(lnTi, wrk::Workspace)
 
     rhs = wrk.P0 * lnTi
-    return jacobi_preconditioned_gmres(wrk.DIFF_lnTi, lnTi, rhs)
+    return parallel_jacobi_preconditioned_gmres(wrk.DIFF_lnTi, lnTi, rhs, 1, wrk.GRID.Nz)
 end
 
 
@@ -110,14 +110,14 @@ function diffusion_u(u, Te, Ti, wrk::Workspace)
 
     cs = wrk.TRGT .* sqrt.(Te + Ti)
     rhs = wrk.P0 * u + wrk.DCHLT3*cs
-    return jacobi_preconditioned_gmres(wrk.DIFF_u, u, rhs)
+    return parallel_jacobi_preconditioned_gmres(wrk.DIFF_u, u, rhs, 1, wrk.GRID.Nz)
 end
 
 
 function diffusion_w(w, wrk::Workspace)
 
     rhs = wrk.P0 * w
-    return jacobi_preconditioned_gmres(wrk.DIFF_w, w, rhs)
+    return parallel_jacobi_preconditioned_gmres(wrk.DIFF_w, w, rhs, 1, wrk.GRID.Nz)
 end
 
 
@@ -125,27 +125,28 @@ function diffusion_A(A, Te, Ti, n, phi, ev, ad, de2, wrk::Workspace)
 
     Abohm = wrk.TRGT .* Abohm_def(Te, Ti, n, phi, ev, ad, de2)
     rhs = wrk.P0 * A + wrk.DCHLT3*Abohm
-    return jacobi_preconditioned_gmres(wrk.DIFF_A, A, rhs)
+    return parallel_jacobi_preconditioned_gmres(wrk.DIFF_A, A, rhs, 1, wrk.GRID.Nz)
 end
 
 
 function vorticity_eqn(phi, w, Pi_xx, Pi_yy, Te, n, lnn_x, lnn_y, phi_b, ad, wrk::Workspace)
 
     M = Diagonal(n) * (wrk.Dxx + wrk.Dyy + Diagonal(lnn_x)*wrk.Dx + Diagonal(lnn_y)*wrk.Dy)
-    LHS = LinearLeftHandSide(wrk.P0*M + wrk.DCHLT1 + wrk.DCHLT2 + wrk.DCHLT3)
+    return M
+    LHS = LinearLeftHandSide(wrk.P0*M + wrk.DCHLT1 + wrk.DCHLT2 + wrk.DCHLT3, 2/3)
 
     lambda = 2.695
     rhs0 = w - ad*(Pi_xx + Pi_yy)
     rhs = wrk.P0*rhs0 + wrk.DCHLT1*phi_b + lambda*(wrk.DCHLT2*Te + wrk.DCHLT3*Te)
 
-    return jacobi_preconditioned_gmres(LHS, phi, rhs)
+    return parallel_jacobi_preconditioned_gmres(LHS, phi, rhs, 1, wrk.GRID.Nz)
 end
 
 
 function helmholtz_eqn(psi, wrk::Workspace)
 
     rhs = wrk.P0 * psi
-    return jacobi_preconditioned(wrk.HHOLTZ, psi, rhs)
+    return parallel_jacobi_preconditioned(wrk.HHOLTZ, psi, rhs, 1, wrk.GRID.Nz)
 end
 
 
@@ -153,6 +154,13 @@ function leapfrog!(lnn, lnTe, lnTi, u, w, A, phi, psi, n, Te, Ti, Pe, Pi, j, jn,
 
     # unpack physical parameters
     am, ad, ki, ke, er, eg, ev, de2, eta = wrk.params
+
+    # take derivatives of psi
+    psi_x = wrk.Dx*psi
+    psi_y = wrk.Dy*psi
+    psi_xy = wrk.Dxy*psi
+    psi_xx = wrk.Dxx*psi
+    psi_yy = wrk.Dyy*psi
 
     # subcycle electron thermal conduction terms
     lnTe0 = lnTe[:,2]
@@ -220,13 +228,7 @@ function leapfrog!(lnn, lnTe, lnTi, u, w, A, phi, psi, n, Te, Ti, Pe, Pi, j, jn,
     end
     lnTi[:,2] = 0.5*(lnTi0 + lnTi[:,2])
 
-    # take derivatives
-    psi_x = wrk.Dx*psi
-    psi_y = wrk.Dy*psi
-    psi_xy = wrk.Dxy*psi
-    psi_xx = wrk.Dxx*psi
-    psi_yy = wrk.Dyy*psi
-
+    # take other derivatives
     phi_x = wrk.Dx*phi
     phi_y = wrk.Dy*phi
     phi_xy = wrk.Dxy*phi
@@ -325,7 +327,7 @@ function leapfrog!(lnn, lnTe, lnTi, u, w, A, phi, psi, n, Te, Ti, Pe, Pi, j, jn,
     lnTi[:,3] = diffusion_lnTi(lnTi[:,3], wrk)
     u[:,3] = diffusion_u(u[:,3])
     w[:,3] = diffusion_w(w[:,3], wrk)
-    phi = vorticity_eqn(phi, w[:,3], Pi_xx, Pi_yy, Te, n[:,3], lnn_x, lnn_y, phi_b, ad, wrk)
+    phi = vorticity_eqn(phi, w[:,3], Pi_xx, Pi_yy, Te, n, lnn_x, lnn_y, phi_b, ad, wrk)
     psi = helmholtz_eqn(psi, wrk)
 
     n = exp.(lnn[:,3])

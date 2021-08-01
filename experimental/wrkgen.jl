@@ -58,10 +58,10 @@ function rectangle_workspace(Nx, Nz, q, a, R0, k, n0, T0, B0, dt)
     smallerdeltas = Float64[-0.1, 0.1, -0.1]
     qs = Float64[10, 10, 10]
     PENs, REFs, DCHLTs, NMANNs = boundary_operators(m, m, MinvT, smallerdeltas, bars, qs, grd)
-    P0, P1, P2, P3 = [kron(Iz, P) for P in PENs]
-    R1, R2, R3 = [kron(Iz, R) for R in REFs]
-    DCHLT1, DCHLT2, DCHLT3 = [kron(Iz, D) for D in DCHLTs]
-    NMANN1, NMANN2, NMANN3 = [kron(Iz, N) for N in NMANNs]
+    P0, P1, P2, P3 = PENs
+    R1, R2, R3 = REFs
+    DCHLT1, DCHLT2, DCHLT3 = DCHLTs
+    NMANN1, NMANN2, NMANN3 = NMANNs
 
     println("generated boundary operators")
 

@@ -57,7 +57,7 @@ Grid(f::Function, Nx, Ny, Nz) = Grid(f()..., Nx, Ny, Nz)
 function vec_to_mesh(vec, grd::Grid)
 
 
-    vals = transpose(grd.Proj) * vec
+    vals = kron(sparse(I, grd.Nz, grd.Nz), transpose(grd.Proj)) * vec
 
     Nx = grd._Nx
     Ny = grd._Ny

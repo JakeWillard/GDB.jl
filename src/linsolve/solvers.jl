@@ -38,7 +38,7 @@ function parallel_jacobi_preconditioned_gmres(L::LinearLeftHandSide, x0::Vector{
 
         xs = Array(x0[inds[1],1])
         bs = b[inds[1]]
-        gmres_solve(A, xs, bs, m, err_thresh=err_thresh)
+        gmres_solve(L.A, xs, bs, m, err_thresh=err_thresh)
     end
 
     return Array(x)
