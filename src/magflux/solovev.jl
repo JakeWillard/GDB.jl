@@ -1,9 +1,3 @@
-using Base: Float64
-# solutions to Grad-Shafranov using Solov'ev profiles
-using DifferentialEquations
-using Plots
-using ForwardDiff
-using LinearAlgebra
 
 # store psis in vector and iterate to do derivatives
 
@@ -155,17 +149,7 @@ function solovev_particular_partial_yy(A, xval, yval)
 end
 
 
-A = -.155
-delta = .33
-kappa = 1.7
-epsilon = .32
-
-x = LinRange(.25, 1.75, 200)
-y = LinRange(-.7, .7, 200)
-# tau, x, y = parameterize(200, delta, epsilon, kappa)
-z = zeros(Float64, (200, 200))
-
-function solovev_flux_function(Aval, delta, epsilon, kappa, upsep=[0,0], downsep=[0,0], B0)
+function solovev_flux_function(Aval, delta, epsilon, kappa, B0; upsep=[0,0], downsep=[0,0])
     alpha = asin(delta)
 
     # last terms are xsep/ysep - can be changed to be inputs if need be
@@ -329,12 +313,3 @@ function solovev_flux_function(Aval, delta, epsilon, kappa, upsep=[0,0], downsep
 
     return psi, bx, by, bz
 end
-
-psi = solovev_flux_function(A, delta, epsilon, kappa, [1-1.1*delta*epsilon, 1.1*kappa*epsilon], [0,0])
-for i=1:200
-    for j=1:200
-        z[j,i] = psi(x[i], y[j])
-    end
-end
-
-contour(z, levels=100)
