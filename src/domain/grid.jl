@@ -16,7 +16,7 @@ end
 
 
 # TODO: parallelize this calculation
-function Grid(is_inside::Function, r0::Vector{Float64}, r1::Vector{Float64}, Nx, Ny, Nz)
+function Grid(is_inside::Function, r0::Vector{Float64}, r1::Vector{Float64}, Nx::Int64, Ny::Int64, Nz::Int64)
 
     deltaX = r1[1] - r0[1]
     deltaY = r1[2] - r0[2]
@@ -49,6 +49,9 @@ function Grid(is_inside::Function, r0::Vector{Float64}, r1::Vector{Float64}, Nx,
     return Grid(r0, points[:,1:k], Proj, dx, dy, k, Nz, Nx, Ny, _nan_outside_boundaries)
 end
 
+
+# constructor for cases where the "do-block" syntax might make the code more readable
+Grid(f::Function, Nx, Ny, Nz) = Grid(f()..., Nx, Ny, Nz)
 
 
 function vec_to_mesh(vec, grd::Grid)

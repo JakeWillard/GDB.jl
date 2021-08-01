@@ -138,3 +138,8 @@ function PolyBarrier(vert)
 
     return Barrier(func, 0.0, rmap)
 end
+
+
+# constructors for cases where the "do-block" syntax might make the code more readable
+Barrier(f::Function) = Barrier(f()...)
+PolyBarrier(f::Function) = PolyBarrier(f())
