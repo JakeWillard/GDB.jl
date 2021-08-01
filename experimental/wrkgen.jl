@@ -24,7 +24,7 @@ function rectangle_workspace(Nx, Nz, q, a, R0, k, n0, T0, B0, dt)
     bars = Barrier[inner_flux, outer_flux, sheaths]
     r0 = Float64[-0.5, -0.5]
     r1 = Float64[1.5, 1.5]
-    grd = Grid((x,y) -> check_if_inside(x, y, bigdeltas, bars), r0, r1, Nx, Nx)
+    grd = Grid((x,y) -> check_if_inside(x, y, bigdeltas, bars), r0, r1, Nx, Nx, Nz)
 
     println("calculated grid")
 
@@ -34,16 +34,15 @@ function rectangle_workspace(Nx, Nz, q, a, R0, k, n0, T0, B0, dt)
     MinvT = Matrix(stencil2d(m, m))
 
     # create derivative matrices
-    Iz = sparse(I, Nz, Nz)
-    Dx = kron(Iz, derivative_matrix(1, 0, Minv, Minv, grd))
-    Dy = kron(Iz, derivative_matrix(0, 1, Minv, Minv, grd))
-    Dxy = kron(Iz, derivative_matrix(1, 1, Minv, Minv, grd))
-    Dxx = kron(Iz, derivative_matrix(2, 0, Minv, Minv, grd))
-    Dyy = kron(Iz, derivative_matrix(0, 2, Minv, Minv, grd))
-    Dxxx = kron(Iz, derivative_matrix(3, 0, Minv, Minv, grd))
-    Dyyy = kron(Iz, derivative_matrix(0, 3, Minv, Minv, grd))
-    Dxxy = kron(Iz, derivative_matrix(2, 1, Minv, Minv, grd))
-    Dxyy = kron(Iz, derivative_matrix(1, 2, Minv, Minv, grd))
+    Dx = derivative_matrix(1, 0, Minv, Minv, grd)
+    Dy = derivative_matrix(0, 1, Minv, Minv, grd)
+    Dxy = derivative_matrix(1, 1, Minv, Minv, grd)
+    Dxx = derivative_matrix(2, 0, Minv, Minv, grd)
+    Dyy = derivative_matrix(0, 2, Minv, Minv, grd)
+    Dxxx = derivative_matrix(3, 0, Minv, Minv, grd)
+    Dyyy = derivative_matrix(0, 3, Minv, Minv, grd)
+    Dxxy = derivative_matrix(2, 1, Minv, Minv, grd)
+    Dxyy = derivative_matrix(1, 2, Minv, Minv, grd)
 
     println("generated derivatives")
 
@@ -99,7 +98,7 @@ function rectangle_workspace(Nx, Nz, q, a, R0, k, n0, T0, B0, dt)
         row = sparse(is, js, dat, 1, grd._Nx*grd._Ny) * transpose(grd.Proj)
         append!(rows, [row])
     end
-    FLXAVG = +(rows...) / 15
+    FLXAVG = +(rows...) / 15 # XXX
 
     println("computed FLXAVG")
 

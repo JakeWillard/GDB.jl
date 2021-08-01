@@ -16,7 +16,7 @@ end
 
 
 # TODO: parallelize this calculation
-function Grid(is_inside::Function, r0::Vector{Float64}, r1::Vector{Float64}, Nx, Ny)
+function Grid(is_inside::Function, r0::Vector{Float64}, r1::Vector{Float64}, Nx, Ny, Nz)
 
     deltaX = r1[1] - r0[1]
     deltaY = r1[2] - r0[2]
@@ -46,7 +46,7 @@ function Grid(is_inside::Function, r0::Vector{Float64}, r1::Vector{Float64}, Nx,
     end
 
     Proj = sparse(proj_rows[1:k], proj_cols[1:k], proj_vals[1:k], k, Nx*Ny)
-    return Grid(r0, points[:,1:k], Proj, dx, dy, Nx, Ny, _nan_outside_boundaries)
+    return Grid(r0, points[:,1:k], Proj, dx, dy, k, Nz, Nx, Ny, _nan_outside_boundaries)
 end
 
 
