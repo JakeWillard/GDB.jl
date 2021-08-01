@@ -77,11 +77,11 @@ function w_forward_euler(w, w_t, wrk::Workspace)
 end
 
 
-function A_forward_euler(A, A_t, Te, Ti, n, phi, ev, ad, de2, wrk::Workspace)
+function A_forward_euler(A, A_t, Te, Ti, n, phi, er, ev, ad, de2, wrk::Workspace)
 
-    Abohm = wrk.TRGT .* Abohm_def(Te, Ti, n, phi, ev, ad, de2)
+    Abohm = wrk.TRGT .* Abohm_def(Te, Ti, n, phi, er, ev, ad, de2)
 
-    return wrk.LAM*(A + wrk.dt*(wrk.P0*A_t + wrk.P3*Abohm))
+    return wrk.LAM*(A + wrk.dt*(wrk.P0*A_t))# + wrk.P3*Abohm))
 end
 
 
@@ -126,10 +126,10 @@ function diffusion_w(w, wrk::Workspace)
 end
 
 
-function diffusion_A(A, Te, Ti, n, phi, ev, ad, de2, wrk::Workspace)
+function diffusion_A(A, Te, Ti, n, phi, er, ev, ad, de2, wrk::Workspace)
 
-    Abohm = wrk.TRGT .* Abohm_def(Te, Ti, n, phi, ev, ad, de2)
-    rhs = wrk.P0 * A + wrk.DCHLT3*Abohm
+    Abohm = wrk.TRGT .* Abohm_def(Te, Ti, n, phi, er, ev, ad, de2)
+    rhs = wrk.P0 * A # + wrk.DCHLT3*Abohm
     return wrk.DIFF_A.A \ rhs
     # return parallel_jacobi_preconditioned_gmres(wrk.DIFF_A, A, rhs, 1, wrk.GRID.Nz)
 end
@@ -148,9 +148,9 @@ function vorticity_eqn(phi, w, Pi_xx, Pi_yy, Te, n, lnn_x, lnn_y, phi_b, ad, wrk
 end
 
 
-function helmholtz_eqn(psi, wrk::Workspace)
+function helmholtz_eqn(A, wrk::Workspace)
 
-    rhs = wrk.P0 * psi
+    rhs = wrk.P0 * A
     return wrk.HHOLTZ.A \ rhs
     # return parallel_jacobi_preconditioned_gmres(wrk.HHOLTZ, psi, rhs, 1, wrk.GRID.Nz)
 end
@@ -323,7 +323,7 @@ function leapfrog!(lnn, lnTe, lnTi, u, w, A, phi, psi, n, Te, Ti, Pe, Pi, j, jn,
     lnTi[:,3] = lnTi_forward_euler(0.5*(lnTi[:,1] + lnTi[:,2]), lnTi_t, wrk)
     u[:,3] = u_forward_euler(0.5*(u[:,1] + u[:,2]), u_t, Te, Ti, wrk)
     w[:,3] = w_forward_euler(0.5*(w[:,1] + w[:,2]), w_t, wrk)
-    A[:,3] = A_forward_euler(0.5*(A[:,1] + A[:,2]), A_t, Te, Ti, n, phi, ev, ad, de2, wrk)
+    A[:,3] = A_forward_euler(0.5*(A[:,1] + A[:,2]), A_t, Te, Ti, n, phi, er, ev, ad, de2, wrk)
 
     # compute inner boundary value for phi
     phi_b = dot(wrk.FLXAVG, phi) * ones(wrk.GRID.Nk*wrk.GRID.Nz)
@@ -335,7 +335,7 @@ function leapfrog!(lnn, lnTe, lnTi, u, w, A, phi, psi, n, Te, Ti, Pe, Pi, j, jn,
     u[:,3] = diffusion_u(u[:,3], Te, Ti, wrk)
     w[:,3] = diffusion_w(w[:,3], wrk)
     phi[:] = vorticity_eqn(phi, w[:,3], Pi_xx, Pi_yy, Te, n, lnn_x, lnn_y, phi_b, ad, wrk)
-    psi[:] = helmholtz_eqn(psi, wrk)
+    psi[:] = helmholtz_eqn(A[:,3], wrk)
 
     n[:] = exp.(lnn[:,3])
     Te[:] = exp.(lnTe[:,3])
@@ -440,7 +440,7 @@ function leapfrog!(lnn, lnTe, lnTi, u, w, A, phi, psi, n, Te, Ti, Pe, Pi, j, jn,
     lnTi[:,3] = lnTi_forward_euler(lnTi[:,2], lnTi_t, wrk)
     u[:,3] = u_forward_euler(u[:,2], u_t, Te, Ti, wrk)
     w[:,3] = w_forward_euler(w[:,2], w_t, wrk)
-    A[:,3] = A_forward_euler(A[:,2], A_t, Te, Ti, n, phi, ev, ad, de2, wrk)
+    A[:,3] = A_forward_euler(A[:,2], A_t, Te, Ti, n, phi, er, ev, ad, de2, wrk)
 
     # compute inner boundary value for phi
     phi_b = dot(wrk.FLXAVG, phi) * ones(wrk.GRID.Nk*wrk.GRID.Nz)
@@ -452,7 +452,7 @@ function leapfrog!(lnn, lnTe, lnTi, u, w, A, phi, psi, n, Te, Ti, Pe, Pi, j, jn,
     u[:,3] = diffusion_u(u[:,3], Te, Ti, wrk)
     w[:,3] = diffusion_w(w[:,3], wrk)
     phi[:] = vorticity_eqn(phi, w[:,3], Pi_xx, Pi_yy, Te, n, lnn_x, lnn_y, phi_b, ad, wrk)
-    psi[:] = helmholtz_eqn(psi, wrk)
+    psi[:] = helmholtz_eqn(A[:,3], wrk)
 
     # shift indices
     lnn[:,1:2] = lnn[:,2:3]
