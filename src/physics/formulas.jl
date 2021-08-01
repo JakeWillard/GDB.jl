@@ -103,11 +103,11 @@ function A_partial_t(phi_x, phi_y, phi_s, j, jn, jn_x, jn_y, jn_s, Pe_s, u, n, T
 end
 
 
-function Abohm_def(Te, Ti, n, phi, ev, ad, de2)
+function Abohm_def(Te, Ti, n, phi, er, ev, ad, de2)
 
     cs = sqrt.(Te + Ti)
     lambda = 2.695
-    jbohm = ev * n.*cs.*(1 .- exp.(lambda .- phi ./(ad*Te)))
+    jbohm = ev * n.*cs.*(1 .- exp.(lambda .- phi ./(ad*Te))) / (ad*er)
 
     return -de2*jbohm
 end

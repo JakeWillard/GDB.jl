@@ -2,7 +2,7 @@
 
 plasma_frequency(n, q, m) = sqrt(4*pi*n*q^2 / m)
 
-gyro_frequency(q, B, m) = q*B / (m * 3e8)
+gyro_frequency(q, B, m) = q*B / (m * 3e10)
 
 electron_collision_time(n, T, q, m, l) = 3*sqrt(m)*T^(3/2) / (4*sqrt(2*pi)*l*n*q^4)
 
