@@ -56,7 +56,7 @@ function rectangle_workspace(Nx, Nz, q, a, R0, k, n0, T0, B0, dt)
 
     # generate boundary operators
     smallerdeltas = Float64[-0.1, 0.1, -0.1]
-    qs = Float64[10, 10, 10]
+    qs = Float64[0.01, 0.01, 0.01]
     PENs, REFs, DCHLTs, NMANNs = boundary_operators(m, m, MinvT, smallerdeltas, bars, qs, grd)
     P0, P1, P2, P3 = PENs
     R1, R2, R3 = REFs

@@ -137,11 +137,11 @@ end
 
 function vorticity_eqn(phi, w, Pi_xx, Pi_yy, Te, n, lnn_x, lnn_y, phi_b, ad, wrk::Workspace)
 
-    M = Diagonal(n) * (wrk.Dxx + wrk.Dyy + Diagonal(lnn_x)*wrk.Dx + Diagonal(lnn_y)*wrk.Dy)
+    M = (wrk.Dxx + wrk.Dyy)# + Diagonal(lnn_x)*wrk.Dx + Diagonal(lnn_y)*wrk.Dy)
     LHS = LinearLeftHandSide(wrk.P0*M + wrk.DCHLT1 + wrk.DCHLT2 + wrk.DCHLT3, 2/3)
 
     lambda = 2.695
-    rhs0 = w - ad*(Pi_xx + Pi_yy)
+    rhs0 = (w - ad*(Pi_xx + Pi_yy)) ./ n
     rhs = wrk.P0*rhs0 + wrk.DCHLT1*phi_b + lambda*(wrk.DCHLT2*Te + wrk.DCHLT3*Te)
     return LHS.A \ rhs
     # return parallel_jacobi_preconditioned_gmres(LHS, phi, rhs, 1, wrk.GRID.Nz; m=100)
@@ -334,16 +334,16 @@ function leapfrog!(lnn, lnTe, lnTi, u, w, A, phi, psi, n, Te, Ti, Pe, Pi, j, jn,
     lnTi[:,3] = diffusion_lnTi(lnTi[:,3], wrk)
     u[:,3] = diffusion_u(u[:,3], Te, Ti, wrk)
     w[:,3] = diffusion_w(w[:,3], wrk)
-    phi = vorticity_eqn(phi, w[:,3], Pi_xx, Pi_yy, Te, n, lnn_x, lnn_y, phi_b, ad, wrk)
-    psi = helmholtz_eqn(psi, wrk)
+    phi[:] = vorticity_eqn(phi, w[:,3], Pi_xx, Pi_yy, Te, n, lnn_x, lnn_y, phi_b, ad, wrk)
+    psi[:] = helmholtz_eqn(psi, wrk)
 
-    n = exp.(lnn[:,3])
-    Te = exp.(lnTe[:,3])
-    Ti = exp.(lnTi[:,3])
-    Pe = n .* Te
-    Pi = n .* Ti
-    j = (wrk.Dxx + wrk.Dyy) * psi
-    jn = j ./ n
+    n[:] = exp.(lnn[:,3])
+    Te[:] = exp.(lnTe[:,3])
+    Ti[:] = exp.(lnTi[:,3])
+    Pe[:] = n .* Te
+    Pi[:] = n .* Ti
+    j[:] = (wrk.Dxx + wrk.Dyy) * psi
+    jn[:] = j ./ n
 
     # take derivatives
     psi_x = wrk.Dx*psi
@@ -451,8 +451,8 @@ function leapfrog!(lnn, lnTe, lnTi, u, w, A, phi, psi, n, Te, Ti, Pe, Pi, j, jn,
     lnTi[:,3] = diffusion_lnTi(lnTi[:,3], wrk)
     u[:,3] = diffusion_u(u[:,3], Te, Ti, wrk)
     w[:,3] = diffusion_w(w[:,3], wrk)
-    phi = vorticity_eqn(phi, w[:,3], Pi_xx, Pi_yy, Te, n, lnn_x, lnn_y, phi_b, ad, wrk)
-    psi = helmholtz_eqn(psi, wrk)
+    phi[:] = vorticity_eqn(phi, w[:,3], Pi_xx, Pi_yy, Te, n, lnn_x, lnn_y, phi_b, ad, wrk)
+    psi[:] = helmholtz_eqn(psi, wrk)
 
     # shift indices
     lnn[:,1:2] = lnn[:,2:3]
@@ -462,11 +462,11 @@ function leapfrog!(lnn, lnTe, lnTi, u, w, A, phi, psi, n, Te, Ti, Pe, Pi, j, jn,
     w[:,1:2] = w[:,2:3]
     A[:,1:2] = A[:,2:3]
 
-    n = exp.(lnn[:,3])
-    Te = exp.(lnTe[:,3])
-    Ti = exp.(lnTi[:,3])
-    Pe = n .* Te
-    Pi = n .* Ti
-    j = (wrk.Dxx + wrk.Dyy) * psi
-    jn = j ./ n
+    n[:] = exp.(lnn[:,3])
+    Te[:] = exp.(lnTe[:,3])
+    Ti[:] = exp.(lnTi[:,3])
+    Pe[:] = n .* Te
+    Pi[:] = n .* Ti
+    j[:] = (wrk.Dxx + wrk.Dyy) * psi
+    jn[:] = j ./ n
 end
