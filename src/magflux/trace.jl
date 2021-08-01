@@ -55,7 +55,7 @@ function trace_fieldline(x0, y0, bx, by, bz, ds, deltaPhi)
 
     while abs(z) < deltaPhi
         x, y, z = rk4_step_3d(x, y, z, bx, by, bz, ds)
-        deltaS += ds
+        deltaS += abs(ds)
     end
 
     return Float64[x, y, deltaS]
@@ -82,14 +82,14 @@ function trace_reflection(x0, y0, psi, bx, by, psi_b, ds)
     while c*(psi(x, y) - psi_b) <= 0
 
         x, y = rk4_step_2d(x, y, fx, fy, ds)
-        deltaS += ds
+        deltaS += abs(ds)
     end
 
     # after reaching boundary, continue tracing distance equal to distance already traced.
     while deltaS >= 0
 
         x, y = rk4_step_2d(x, y, fx, fy, ds)
-        deltaS -= ds
+        deltaS -= abs(ds)
     end
 
     return Float64[x, y]
