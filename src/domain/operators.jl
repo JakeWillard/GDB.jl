@@ -40,8 +40,9 @@ function derivative_matrix(nx, ny, Mxinv, Myinv, grd::Grid)
     D = kron(Dy, Dx)
     P = grd.Proj
     Pinv = transpose(grd.Proj)
+    D2d = P * D * Pinv / ((grd.dx)^nx *(grd.dy)^ny)
 
-    return P * D * Pinv / ((grd.dx)^nx *(grd.dy)^ny)
+    return kron(sparse(I, grd.Nz, grd.nz), D2d)
 end
 
 
@@ -57,18 +58,20 @@ function reflection_matrix(delta, mx, my, MinvT, bar::Barrier, grd::Grid)
     M = grid_map(f, (mx*my,2), grd)
     dat = M[:,1]
     js = Int64[M[:,2]...]
-    is = vcat([k*ones(Int64, mx*my) for k=1:size(grd.points)[2]]...)
+    is = vcat([k*ones(Int64, mx*my) for k=1:grd.Nk]...)
 
-    return sparse(is, js, dat, size(grd.points)[2], grd._Nx*grd._Ny) * transpose(grd.Proj)
+    R2d = sparse(is, js, dat, grd.Nk, grd._Nx*grd._Ny) * transpose(grd.Proj)
+    R3d = kron(sparse(I, grd.Nz, grd.Nz), R2d)
+
+    return R3d
 end
 
 
 function boundary_operators(mx, my, MinvT, deltas::Vector{Float64}, bars::Vector{Barrier}, qs::Vector{Float64}, grd::Grid)
 
-    Nk = size(grd.points)[2]
     Nb = length(bars)
 
-    PEN = SparseMatrixCSC[sparse(I, Nk, Nk)]
+    PEN = SparseMatrixCSC[sparse(I, grd.Nz*grd.Nk, grd.Nz*grd.Nk)]
     REF = SparseMatrixCSC[]
     DCHLT = SparseMatrixCSC[]
     NMANN = SparseMatrixCSC[]

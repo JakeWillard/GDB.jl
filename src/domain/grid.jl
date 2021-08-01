@@ -6,6 +6,8 @@ struct Grid
     Proj :: SparseMatrixCSC
     dx :: Float64
     dy :: Float64
+    Nk :: Int64
+    Nz :: Int64
     _Nx :: Int64
     _Ny :: Int64
     _nan_outside_boundaries :: Matrix{Float64}
@@ -56,40 +58,42 @@ function vec_to_mesh(vec, grd::Grid)
 
     Nx = grd._Nx
     Ny = grd._Ny
-    out = zeros(Float64, (Nx, Ny))
-
-    for j=1:Ny
-        out[:,j] = vals[1+(j-1)*Nx:j*Nx]
+    Nz = grd.Nz
+    out = zeros(Float64, (Nx, Ny, Nz))
+    for i=1:Nx
+        for j=1:Ny
+            for k=1:Nz
+                l = (i + (j-1)*Nx) + (k-1)*Nx*Ny
+                out[i,j,k] = vals[l] * grd._nan_outside_boundaries[i,j]
+            end
+        end
     end
 
-    return out .* grd._nan_outside_boundaries
+    return out
 end
 
 
 function f_to_grid(f::Function, grd::Grid)
 
-    Nk = size(grd.points)[2]
-    vec = Float64[f(grd.points[:,k]...) for k=1:Nk]
+    vec = Float64[f(grd.points[:,k]...) for k=1:grd.Nk]
 
-    return vec
+    return vcat([vec for _=1:grd.Nz]...)
 end
 
 
-# overloading Base.map() to operate on the points in the grid, using pmap instead of usual map
 function grid_map(f::Function, outsize::Tuple{Int64, Int64}, grd::Grid)
 
     n, m = outsize
-    Nk = size(grd.points)[2]
-    output = SharedArray{Float64}((n*Nk,m))
+    output = SharedArray{Float64}((n*grd.Nk,m))
 
     # @distributed unfortunately only works if nprocs > 1
     if nprocs() > 1
-        @distributed for i=1:Nk
+        @distributed for i=1:grd.Nk
             k = 1 + n*(i-1)
             output[k:k+n-1,:] = f(grd.points[:,i]..., grd)
         end
     else
-        for i=1:Nk
+        for i=1:grd.Nk
             k = 1 + n*(i-1)
             output[k:k+n-1,:] = f(grd.points[:,i]..., grd)
         end

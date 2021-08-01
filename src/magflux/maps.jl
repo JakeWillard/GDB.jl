@@ -20,9 +20,9 @@ function fieldline_map_matrix(bx::Function, by::Function, bz::Function, ds::Floa
     dS = M[1:mx*my:end,3]
     dat = M[:,1]
     js = Int64[M[:,2]...]
-    is = vcat([k*ones(Int64, mx*my) for k=1:size(grd.points)[2]]...)
+    is = vcat([k*ones(Int64, mx*my) for k=1:grd.Nk]...)
 
-    matrix = sparse(is, js, dat, size(grd.points)[2], grd._Nx*grd._Ny) * transpose(grd.Proj)
+    matrix = sparse(is, js, dat, grd.Nk, grd._Nx*grd._Ny) * transpose(grd.Proj)
     return matrix, dS
 end
 
