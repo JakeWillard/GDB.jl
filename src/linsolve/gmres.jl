@@ -67,13 +67,20 @@ function gmres_cycle(A::SparseMatrixCSC, x0::Vector{Float64}, b::Vector{Float64}
 end
 
 
-function gmres_solve(A::SparseMatrixCSC, x0::Vector{Float64}, b::Vector{Float64}, m::Int64; err_thresh = 1e-20)
+function gmres_solve(A::SparseMatrixCSC, x0::Vector{Float64}, b::Vector{Float64}, m::Int64; maxiters=10000, err_thresh = 1e-20)
 
     x = x0[:]
     err = 1.0
+    iteration = 0
 
-    while err > err_thresh
+    while (err > err_thresh)
         x, err = gmres_cycle(A, x, b, m, err_thresh=err_thresh)
+        iteration += 1
+
+        if iteration > maxiters
+            @warn "Iteration limit reached, defaulting to direct solver."
+            return A \ b
+        end
     end
 
     return x
