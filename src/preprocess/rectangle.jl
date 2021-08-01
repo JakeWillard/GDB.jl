@@ -2,7 +2,6 @@
 
 function rectangle_workspace(Nx, Nz, q, a, R0, k, n0, T0, B0, dt)
 
-    println()
     # define flux surfaces
     psi(x, y) = -y
     rmap_in(x, y) = [x, -y]
@@ -26,7 +25,7 @@ function rectangle_workspace(Nx, Nz, q, a, R0, k, n0, T0, B0, dt)
     r1 = Float64[1.5, 1.5]
     grd = Grid((x,y) -> check_if_inside(x, y, bigdeltas, bars), r0, r1, Nx, Nx, Nz)
 
-    println("calculated grid")
+    @info "Computed Grid" Nk=grd.Nk
 
     # make 5 points stencils
     m = 5
@@ -44,7 +43,7 @@ function rectangle_workspace(Nx, Nz, q, a, R0, k, n0, T0, B0, dt)
     Dxxy = derivative_matrix(2, 1, Minv, Minv, grd)
     Dxyy = derivative_matrix(1, 2, Minv, Minv, grd)
 
-    println("generated derivatives")
+    @info "Generated x and y derivatives"
 
     # create field-line derivative matrices
     bx(x, y) = 1 / sqrt(1 + (R0*q/a)^2)
@@ -52,7 +51,7 @@ function rectangle_workspace(Nx, Nz, q, a, R0, k, n0, T0, B0, dt)
     bz(x, y) = R0*q*bx(x, y) / a
     Ds, Dss = fieldline_derivatives(bx, by, bz, 0.001, m, m, MinvT, Nz, grd)
 
-    println("generated field-line derivatives")
+    @info "Generated field-line derivatives"
 
     # generate boundary operators
     smallerdeltas = Float64[-0.1, 0.1, -0.1]
@@ -63,12 +62,10 @@ function rectangle_workspace(Nx, Nz, q, a, R0, k, n0, T0, B0, dt)
     DCHLT1, DCHLT2, DCHLT3 = DCHLTs
     NMANN1, NMANN2, NMANN3 = NMANNs
 
-    println("generated boundary operators")
+    @info "Generated boundary operators"
 
     # compute LAM matrix
     LAM = Diagonal(1 ./ (1 .+ dt*diag(P1 + P2 + P3)))
-
-    println("computed LAM")
 
     # setup diffusion problems with diffusion constant k
     L = I - k*(Dxx + Dyy)
@@ -87,7 +84,7 @@ function rectangle_workspace(Nx, Nz, q, a, R0, k, n0, T0, B0, dt)
     Lhelm = I - de2*(Dxx + Dyy)
     HHOLTZ = LinearLeftHandSide(P0*Lhelm + DCHLT1 + DCHLT2 + DCHLT3, 2/3)
 
-    println("setup linear problems")
+    @info "Setup linear problems"
 
     # compute FLXAVG, from middle flux surface
     flxpoints = hcat([Float64[x, 0.5] for x in LinRange(0, 1, 15)]...)
@@ -100,8 +97,6 @@ function rectangle_workspace(Nx, Nz, q, a, R0, k, n0, T0, B0, dt)
     end
     FLXAVG = +(rows...) / 15 # XXX
 
-    println("computed FLXAVG")
-
     # define TRGT
     TRGT = f_to_grid((x, y) -> sign(x - 0.5), grd)
 
@@ -109,8 +104,6 @@ function rectangle_workspace(Nx, Nz, q, a, R0, k, n0, T0, B0, dt)
     Sn = f_to_grid((x,y) -> 1/(100*dt), grd)
     STe = f_to_grid((x,y) -> 1/(100*dt), grd)
     STi = f_to_grid((x,y) -> 1/(100*dt), grd)
-
-    println("computed source terms")
 
     # subcycle 20 times per timestep
     N_subcycle = 20
