@@ -139,6 +139,7 @@ function save_assets(fid, a::Assets, name::String)
     fid["$(name)/params"][:] = a.params[:]
     fid["$(name)/dt"][:] = Float64[a.dt]
     fid["$(name)/N_subcycle"][:] = Int64[a.N_subcycle]
+    fid["$(name)/seed"][:] = a.seed[:]
 
     @info "Assets '$(name)' saved to disk."
 end
@@ -196,6 +197,7 @@ function load_assets(fid, name::String)
     params = fid["$(name)/params"][:]
     dt = fid["$(name)/dt"][1]
     N_subcycle = fid["$(name)/N_subcycle"][1]
+    seed = fid["$(name)/seed"][:]
 
     @info "Loaded Assets '$(name)'."
 
@@ -203,5 +205,5 @@ function load_assets(fid, name::String)
                      DIFF_lnn, DIFF_lnTe, DIFF_lnTi, DIFF_u, DIFF_w, DIFF_A,
                      HHOLTZ, P0, P1, P2, P3, R1, R2, R3, LAM, DCHLT1, DCHLT2,
                      DCHLT3, NMANN1, NMANN2, NMANN3, FLXAVG, TRGT, Sn, STe,
-                     STi, params, dt, N_subcycle)
+                     STi, params, dt, N_subcycle, seed)
 end
