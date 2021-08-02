@@ -1,5 +1,6 @@
 using Plots
 using LinearAlgebra
+using SparseArrays
 # 1. initialize rho, uvec, f_i and feq_i
 # 2. Streaming: move f_i -> f*_i in the direction of evec_i
 # 3. Compute macroscopic rho and uvec from f*_i using:
@@ -11,12 +12,86 @@ using LinearAlgebra
 
 # make u, e three dimensional to contain index and 2D vector info?
 
+struct StreamTensor
+
+    E :: SparseMatrixCSC
+    SE :: SparseMatrixCSC
+    S :: SparseMatrixCSC
+    SW :: SparseMatrixCSC
+    W :: SparseMatrixCSC
+    NW :: SparseMatrixCSC
+    N :: SparseMatrixCSC
+    NE :: SparseMatrixCSC
+
+end
+
+
+function CreateStreamTensor(Nx, Ny)
+
+    Fx = spdiagm(-1 => ones(Nx - 1))
+    Fx[1,Nx] = 1
+    Bx = spdiagm(1 => ones(Nx - 1))
+    Bx[Nx,1] = 1
+
+    Fy = spdiagm(-1 => ones(Ny - 1))
+    Fy[1,Ny] = 1
+    By = spdiagm(1 => ones(Ny - 1))
+    By[Ny,1] = 1
+
+    Ix = sparse(I, Nx, Nx)
+    Iy = sparse(I, Ny, Ny)
+
+    E = kron(Iy, Fx)
+    SE = kron(By, Fx)
+    S = kron(By, Ix)
+    SW = kron(By, Bx)
+    W = kron(Iy, Bx)
+    NW = kron(Fy, Bx)
+    N = kron(Fy, Ix)
+    NE = kron(Fy, Fx)
+
+    return StreamTensor(E, SE, S, SW, W, NW, N, NE)
+end
+
+
+function Base.:*(S::StreamTensor, f::Array{Float64, 3})
+
+    out = zeros(size(f))
+
+    out[:,:,1] = f[:,:,1]
+    out[:,:,2] = S.E * f[:,:,2]
+    out[:,:,3] = S.N * f[:,:,3]
+    out[:,:,4] = S.W * f[:,:,4]
+    out[:,:,5] = S.S * f[:,:,5]
+    out[:,:,6] = S.NE * f[:,:,6]
+    out[:,:,7] = S.NW * f[:,:,7]
+    out[:,:,8] = S.SW * f[:,:,8]
+    out[:,:,9] = S.SE * f[:,:,9]
+
+    return out
+end
+
 
 function lattice_boltzmann_method(xres, yres, f, N, tau, c, count=0)
     # vector at each point with nine dimensions corresponding to each direction 0-8
+    ftransform = zeros(xres*yres, 9)
+    for j=1:yres
+        for i=1:xres
+            ftransform[(j-1)*xres+i,:] = f[i,j,:]
+        end
+    end
     
-    fnew = zeros((xres, yres, 9))
-    for i=1:xres
+    stensor = CreateStreamTensor(xres, yres)
+    fnewtransform = stensor * ftransform
+
+    fnew = zeros(xres, yres, 9)
+    for j=1:yres
+        for i=1:xres
+            fnew[i,j,:] = fnewtransform[(j-1)*xres+i,:]
+        end
+    end
+
+    """for i=1:xres
         for j=1:yres
             # periodic boundary conditions - checking if at corners/edges to ensure no out of bounds
             if i==1 && j==1
@@ -111,7 +186,7 @@ function lattice_boltzmann_method(xres, yres, f, N, tau, c, count=0)
                 fnew[i,j,9] = f[i-1,j-1,9]
             end
         end
-    end
+    end"""
 
     rho = zeros((xres, yres))
     for i=1:xres
@@ -149,8 +224,8 @@ function lattice_boltzmann_method(xres, yres, f, N, tau, c, count=0)
             for k=1:9
                 usquared[i,j] = usquared[i,j] + u[i,j,k]^2
             end
-            for m=1:9
-                s[i,j,m] = w[m] * (3*u[i,j,m]/c + 9/2*u[i,j,m]^2/c^2 - 3/2*usquared[i,j]/c^2)
+            for k=1:9
+                s[i,j,k] = w[k] * (3*u[i,j,k]/c + 9/2*u[i,j,k]^2/c^2 - 3/2*usquared[i,j]/c^2)
             end
         end
     end
@@ -194,8 +269,18 @@ for i=1:xres
         end
     end
 end
-N = 10
-tau = .25
+
+fsine = zeros(xres, yres, 9)
+for i=1:xres
+    for j=1:yres
+        for k=1:9
+            fsine[i,j,k] = sin(i*pi/xres)*sin(j*pi/yres)
+        end
+    end
+end
+
+N = 100
+tau = 1000
 deltax = 10000
 deltat = 1
 c = deltax/deltat
@@ -214,17 +299,17 @@ end
 
 
 anim = @animate for i=1:N
-    fgauss = lattice_boltzmann_method(xres, yres, fgauss, 1, tau, c)
+    fsine = lattice_boltzmann_method(xres, yres, fsine, 1, tau, c)
     fplot = zeros(xres, yres)
     for i=1:xres
         for j=1:yres
             for k=1:9
-                fplot[i,j] = fplot[i,j] + fgauss[i,j,k]
+                fplot[i,j] = fplot[i,j] + fsine[i,j,k]
             end
             f0[i,j] = f[i,j,5]
         end
     end
     println(fplot[Int32(xres/2),Int32(yres/2)])
-    heatmap(fplot, clims=(0,170))
+    heatmap(fplot)
 end
-gif(anim, fps=1)
+gif(anim, fps=10)
