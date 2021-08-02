@@ -139,7 +139,7 @@ function simple_solovev_assets(Nx, Ny, A, ep, ka, del, L, R0, n0, T0, B0)
         end
 
         samlldeltas = ones(3) * L / 4
-        qs = []
+        qs = ones(3) * 0.01
         bdry = boundary_operators(3, 3, stencil2d(3, 3), smalldeltas, bars, qs, grd)
 
         lcfs_pts = zeros(2, 30)
