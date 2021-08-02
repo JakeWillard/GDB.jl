@@ -43,7 +43,7 @@ function fieldline_derivatives(bx::Function, by::Function, bz::Function, ds::Flo
 
     # make off diagonal matrices for kronecker product
     Ia = spdiagm(-1 => ones(Float64, Nz-1))
-    Ia[1,end] = -1
+    Ia[1,end] = 1
     Ib = sparse(I, Nz, Nz)
     Ic = spdiagm(1 => ones(Float64, Nz-1))
     Ic[end,1] = 1
@@ -54,3 +54,5 @@ function fieldline_derivatives(bx::Function, by::Function, bz::Function, ds::Flo
 
     return Ds, Dss
 end
+
+diagm(-1 => ones(Float64, ))
