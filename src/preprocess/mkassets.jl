@@ -46,7 +46,7 @@ struct Assets
 end
 
 
-function Assets(geoinit::Function, phys_ref::Vector{Float64}, Nz::Int64, ds::Float64; k=0.2, w=0.66, mx=5, my=5, N_subcycle=100)
+function Assets(geoinit::Function, phys_ref::Vector{Float64}, Nz::Int64, ds::Float64, dt::Float64; k=0.2, w=0.66, mx=5, my=5, N_subcycle=100)
 
     grd, bdry, lcfs_pts, trgt_splitter, srcs, bx, by, bz = geoinit()
     params = dimensionless_parameters(phys_ref...)
@@ -107,4 +107,59 @@ function Assets(geoinit::Function, phys_ref::Vector{Float64}, Nz::Int64, ds::Flo
                      HHOLTZ, P0, P1, P2, P3, R1, R2, R3, LAM, DCHLT1, DCHLT2,
                      DCHLT3, NMANN1, NMANN2, NMANN3, FLXAVG, TRGT, Sn, STe,
                      STi, params, dt, N_subcycle)
+end
+
+
+function simple_solovev_assets(Nx, Ny, A, ep, ka, del, L, R0, n0, T0, B0)
+
+    phys_ref = [ep*R0, n0, T0, B0]
+
+    Assets(phys_ref, 1, 0.001, 0.001) do
+
+        psi, bx, by, bz = solovev_flux_function(A, del, ep, ka, 1.0)
+        psi_in = psi(1 - epsilon + L, 0)
+        psi_out = 0
+
+        inner_flux_surface = Barrier() do
+            rmap(x, y) = trace_reflection(x, y, psi, bx, by, psi_in, 0.001)
+            psi, psi_in, rmap
+        end
+
+        outer_flux_surface = Barrier() do
+            rmap(x, y) = trace_reflection(x, y, psi, bx, by, psi_out, 0.001)
+            psi, psi_out, rmap
+        end
+
+        bars = [inner_flux_surface, outer_flux_surface, Everywhere()]
+        bigdeltas = ones(3) * L/2
+        r0 = []
+        r1 = []
+        grd = Grid(r0, r1, Nx, Ny, 1) do x,y
+            check_if_inside(x, y, bigdeltas, bars)
+        end
+
+        samlldeltas = ones(3) * L / 4
+        qs = []
+        bdry = boundary_operators(3, 3, stencil2d(3, 3), smalldeltas, bars, qs, grd)
+
+        lcfs_pts = zeros(2, 30)
+        ts = LinRange(0, 2*pi, 31)
+        ts = ts[1:end-1]
+        alpha = asin(del)
+        for i=1:30
+            lcfs_pts[1,i] = 1 + (ep-L/2)*cos(ts[i] + alpha*sin(ts[i]))
+            lcfs_pts[2,i] = (ep-L/2)*ka*sin(ts[i])
+        end
+
+        # trgt_splitter doesn't matter because there is no limiter or diverter here
+        trgt_splitter = Float64[0 1; 0 1]
+
+        # define constant source for now
+        Sn = f_to_grid((x,y) -> 1/(100*dt), grd)
+        STe = f_to_grid((x,y) -> 1/(100*dt), grd)
+        STi = f_to_grid((x,y) -> 1/(100*dt), grd)
+
+        grd, bdry, lcfs_pts, trgt_splitter, [Sn, STe, STi], bx, by, bz
+    end
+
 end
