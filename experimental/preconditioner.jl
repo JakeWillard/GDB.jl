@@ -17,13 +17,3 @@ function compute_preconditioner(A::SparseMatrixCSC, bandwidth::Int64)
 
     return sparse(is, js, dat_pc, n, m)
 end
-
-
-struct StreamTensor
-
-    N :: SparseMatrixCSC
-    S ::
-    SW ::
-
-
-end
