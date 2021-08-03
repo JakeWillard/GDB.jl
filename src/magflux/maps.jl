@@ -54,5 +54,3 @@ function fieldline_derivatives(bx::Function, by::Function, bz::Function, ds::Flo
 
     return Ds, Dss
 end
-
-diagm(-1 => ones(Float64, ))
