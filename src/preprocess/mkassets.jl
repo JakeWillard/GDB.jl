@@ -48,6 +48,7 @@ end
 
 function Assets(geoinit::Function, phys_ref::Vector{Float64}, Nz::Int64, ds::Float64, dt::Float64; k=0.2, w=0.66, mx=5, my=5, N_subcycle=100)
 
+    # return geoinit()
     grd, bdry, lcfs_pts, trgt_splitter, srcs, bx, by, bz = geoinit()
     params = dimensionless_parameters(phys_ref...)
 
@@ -74,6 +75,8 @@ function Assets(geoinit::Function, phys_ref::Vector{Float64}, Nz::Int64, ds::Flo
     Dxyy = derivative_matrix(1, 2, Mxinv, Myinv, grd)
     Ds, Dss = fieldline_derivatives(bx, by, bz, ds, mx, my, MxyinvT, Nz, grd)
 
+    @info "Generated derivative matrices."
+
     # compute LAM
     LAM = Diagonal(1 ./ (1 .+ dt*diag(P1 + P2 + P3)))
 
@@ -88,6 +91,8 @@ function Assets(geoinit::Function, phys_ref::Vector{Float64}, Nz::Int64, ds::Flo
     DIFF_w = LinearLeftHandSide(P0*Ldiff + DCHLT1 + DCHLT2 + DCHLT3, w)
     DIFF_A = LinearLeftHandSide(P0*Ldiff + DCHLT1 + DCHLT2 + DCHLT3, w)
     HHOLTZ = LinearLeftHandSide(P0*Lhelm + DCHLT1 + DCHLT2 + DCHLT3, w)
+
+    @info "Setup linear problems."
 
     # compute vector for averaging over the LCFS
     rows = SparseMatrixCSC[]
@@ -117,7 +122,7 @@ function simple_solovev_assets(Nx, Ny, A, ep, ka, del, L, R0, n0, T0, B0)
     Assets(phys_ref, 1, 0.001, 0.001) do
 
         psi, bx, by, bz = solovev_flux_function(A, del, ep, ka, 1.0)
-        psi_in = psi(1 - epsilon + L, 0)
+        psi_in = psi(1 - ep + L, 0)
         psi_out = 0
 
         inner_flux_surface = Barrier() do
@@ -131,16 +136,22 @@ function simple_solovev_assets(Nx, Ny, A, ep, ka, del, L, R0, n0, T0, B0)
         end
 
         bars = [inner_flux_surface, outer_flux_surface, Everywhere()]
-        bigdeltas = ones(3) * L/2
-        r0 = []
-        r1 = []
-        grd = Grid(r0, r1, Nx, Ny, 1) do x,y
-            check_if_inside(x, y, bigdeltas, bars)
+        bigdeltas = [1, -1, 1] * L/2
+        grd = Grid(Nx, Ny, 1) do
+            r0 = [0.01, -(ka*ep + L)]
+            r1 = [1 + ep+L, ka*ep + L]
+            (x,y) -> check_if_inside(x, y, bigdeltas, bars), r0, r1
         end
 
-        samlldeltas = ones(3) * L / 4
+        # return grd
+
+        @info "Generated Grid"
+
+        smalldeltas = bigdeltas / 2.0
         qs = ones(3) * 0.01
         bdry = boundary_operators(3, 3, stencil2d(3, 3), smalldeltas, bars, qs, grd)
+
+        @info "Generated boundary operators."
 
         lcfs_pts = zeros(2, 30)
         ts = LinRange(0, 2*pi, 31)

@@ -158,12 +158,6 @@ function approximate_inverse(A::SparseMatrixCSC, n::Int)
     return Ainv, Ainv*A
 end
 
-
-
-
-
-
-
 # this algorithm is apparently successful as a two-sided preconditioner according to https://arxiv.org/pdf/1610.03871.pdf
 # and also discussed in https://arxiv.org/pdf/1110.2805.pdf
 function sinkhorn_knopp(A::SparseMatrixCSC; err=1e-8)
