@@ -149,7 +149,7 @@ function solovev_particular_partial_yy(A, xval, yval)
 end
 
 
-function solovev_flux_function(Aval, delta, epsilon, kappa, B0; upsep=[0,0], downsep=[0,0])
+function solovev_flux_function(A, delta, epsilon, kappa, B0; upsep=[0,0], downsep=[0,0])
     alpha = asin(delta)
 
     # last terms are xsep/ysep - can be changed to be inputs if need be
@@ -301,8 +301,8 @@ function solovev_flux_function(Aval, delta, epsilon, kappa, B0; upsep=[0,0], dow
     psifunctions = solovev_psi_functions()
     psi(x,y) = solovev_particular_psi(A,x,y) .+ dot(c, [p(x,y) for p in psifunctions])
 
-    Bx(x, y) = ForwardDiff.derivative(u -> psi(x,u), y)
-    By(x, y) = ForwardDiff.derivative(u -> -psi(u,y), x)
+    Bx(x, y) = ForwardDiff.derivative(u -> -psi(x,u), y)
+    By(x, y) = ForwardDiff.derivative(u -> psi(u,y), x) #XXX changed the sign of this to make consistent with trace.jl, should check later which way is actually correct. 
     # B0 = R0^4*B0^2/psi0^2
     Bphi(x,y) = (B0^2 - 2*A*psi(x,y))^(1/2)
     B(x,y) = norm(Float64[Bx(x,y), By(x,y), Bphi(x,y)])
