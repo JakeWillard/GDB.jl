@@ -61,16 +61,16 @@ function spec_rad(M::SparseMatrixCSC)
     v = rand(n)
     v = v / norm(v)
     rho = 2
-    for _=1:100
+    for _=1:10000
         u = M * v
-        rho_next = dot(u, v)
-        v = u / norm(u)
+        rho_next = abs(dot(u, v))
+        v[:] = u / norm(u)
 
         if abs(rho_next - rho) < 1e-8
             rho = rho_next
             break
         end
-        rho  = rho_next
+        rho = rho_next
     end
 
     return rho
@@ -107,6 +107,58 @@ function optimal_scaling(A::SparseMatrixCSC, t)
 
     return C, D, Sl, Sr, res
 end
+
+
+
+function optimal_two_sided(A::SparseMatrixCSC)
+
+    n,_ = size(A)
+    is, js, dat = findnz(A)
+    nnz = length(dat)
+
+    rad(a) = begin
+        r1_dat = a[1:nnz]
+        r2_dat = a[nnz+1:end]
+        L = sparse(is, js, r1_dat, n, n)
+        R = sparse(is, js, r2_dat, n, n)
+        M = L * A * R
+        C = I - Diagonal(1 ./ diag(M)) * M
+        # return opnorm(Matrix(C))
+        return spec_rad(C)
+    end
+
+    res = optimize(rad, ones(2*nnz), SimulatedAnnealing(), Optim.Options(time_limit=30))
+    rho = Optim.minimum(res)
+    af = Optim.minimizer(res)
+    r1_dat = af[1:nnz]
+    r2_dat = af[nnz+1:end]
+    L = sparse(is, js, r1_dat, n, n)
+    R = sparse(is, js, r2_dat, n, n)
+    M = L * A * R
+
+
+    return M, L, R, rho
+end
+
+
+
+function approximate_inverse(A::SparseMatrixCSC, n::Int)
+
+    is, js, dat = findnz(A.^n)
+    N, _ = size(A)
+    nnz = length(dat)
+
+    f(a) = begin
+        Ainv = sparse(is, js, a, N, N)
+        return opnorm(Matrix(I - Ainv*A))
+    end
+
+    res = optimize(f, ones(nnz))
+    Ainv = sparse(is, js, Optim.minimizer(res), N, N)
+    return Ainv, Ainv*A
+end
+
+
 
 
 
