@@ -3,7 +3,7 @@
 changes:
     - reflections should be calculated exclusively on ghost points.
     - reflection_matrix() function should have input argument determining if we want
-      a reflection or anti-reflection operation, and also input for what to do on other points. 
+      a reflection or anti-reflection operation, and also input for what to do on other points.
 """
 
 
@@ -21,21 +21,52 @@ opnorm(l::LinearMap) = opnorm(Matrix(l.M))   # WARNING: never call this unless t
 
 
 
-function subspace_projection(isnt_ghost::Function, grd::Grid)
 
-    is = Int64[1:grd.Nk...]
-    js = zeros(Int64, grd.Nk)
-    dat = ones(Int64, grd.Nk)
-    new_points = zeros(2, grd.Nk)
+struct BoundaryCondition
 
-    k = 0
-    for i=1:grd.Nk
-        if isnt_ghost(grd.points[:,i]...)
-            k += 1
-            js[k] = i
-            new_points[:,k] = grd.points[:,i]
-        end
+    Proj :: SparseMatrixCSC
+    R :: SparseMatrixCSC
+
+end
+
+
+
+function BoundaryCondition(condition_type::Int64, mx, my, MinvT, orientation::Int64, bar::Barrier, grd::Grid)
+
+    is_r = Int64[]
+    js_r = Int64[]
+    dat_r = Float64[]
+
+    is_p = Int64[1:grd.Nk...]
+    js_p = Int64[]
+    dat_p = ones(Float64, grd.Nk)
+
+    if condition_type == 1
+        parity = -1   # Dirichlet-like condition
+    elseif condition_type == 2
+        parity = 1    # Neumann-like condition
+    else
+        @error "Invalid condition type"
     end
 
-    return new_points[:,1:k], sparse(is[1:k], js[1:k], dat[1:k], k, grd.Nk)
+    ng = 0
+    for k=1:grd.Nk
+        if smoothstep(grd.points[:,k]..., orientation, bar) < 0.5
+            ng += 1
+            x, y = bar.rmap(grd.points[:,k]...)
+            row_dat, row_j = interpolation_row(x, y, mx, my, MinvT, grd)
+            js_r = [js_r; row_j]
+            dat_r = [dat_r; condition_type * row_dat]
+            js_p = [js_p; k]
+        else
+            js_r = [js_r; k]
+            dat_r = [dat_r; 1.0]
+        end
+        is_r = [is_r; k]
+    end
+
+    R = sparse(is_r, js_r, dat_r, grd.Nk, grd.Nk)
+    P = sparse(is_p[1:ng], js_p, dat_p[1:ng], ng, grd.Nk)
+
+    return BoundaryCondition(P, R)
 end
