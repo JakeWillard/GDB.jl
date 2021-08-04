@@ -16,18 +16,21 @@ end
 
 
 # TODO: parallelize this calculation
-function Grid(is_inside::Function, r0::Vector{Float64}, r1::Vector{Float64}, Nx::Int64, Ny::Int64, Nz::Int64)
+function Grid(is_inside::Function, r0::Vector{Float64}, r1::Vector{Float64}, Nx::Int64, Ny::Int64, Nz::Int64; Nbuffer=100)
 
     deltaX = r1[1] - r0[1]
     deltaY = r1[2] - r0[2]
     dx = deltaX / Nx
     dy = deltaY / Ny
 
+    _Nx = Nx + Nbuffer
+    _Ny = Ny + Nbuffer
+
     points = zeros(Float64, (2, Nx*Ny))
     proj_rows = Int32[i for i=1:Nx*Ny]
     proj_cols = zeros(Int32, Nx*Ny)
     proj_vals = ones(Int32, Nx*Ny)
-    _nan_outside_boundaries = fill(NaN, (Nx, Ny))
+    _nan_outside_boundaries = fill(NaN, (_Nx, _Ny))
     k = 0
 
     for j=1:Ny
@@ -38,15 +41,15 @@ function Grid(is_inside::Function, r0::Vector{Float64}, r1::Vector{Float64}, Nx:
             if is_inside(x, y)
                 k += 1
                 points[:,k] = [x, y]
-                proj_cols[k] = i + Nx*(j-1)
+                proj_cols[k] = i + _Nx*(j-1+Nbuffer) + Nbuffer
                 _nan_outside_boundaries[i,j] = 1.0
             end
 
         end
     end
 
-    Proj = sparse(proj_rows[1:k], proj_cols[1:k], proj_vals[1:k], k, Nx*Ny)
-    return Grid(r0, points[:,1:k], Proj, dx, dy, k, Nz, Nx, Ny, _nan_outside_boundaries)
+    Proj = sparse(proj_rows[1:k], proj_cols[1:k], proj_vals[1:k], k, _Nx*_Ny)
+    return Grid(r0, points[:,1:k], Proj, dx, dy, k, Nz, _Nx, _Ny, _nan_outside_boundaries)
 end
 
 
