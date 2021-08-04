@@ -30,7 +30,7 @@ function stencil2d(mx, my)
         end
     end
 
-    return transpose(inv(M))
+    return Matrix(transpose(inv(M)))
 end
 
 

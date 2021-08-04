@@ -1,7 +1,8 @@
 
 function compute_jacobi_matrices(A::SparseMatrixCSC, w::Float64)
 
-    D = sparse(w*inv(Diagonal(A)))
+    # D = sparse(w*inv(Diagonal(A)))
+    D = w*sparse(Diagonal(1 ./ diag(A)))
     M = I - D*A
     return M, D
 end

@@ -86,6 +86,7 @@ function boundary_operators(mx, my, MinvT, deltas::Vector{Float64}, bars::Vector
 
     for i=1:Nb
         R = reflection_matrix(deltas[i], mx, my, MinvT, bars[i], grd)
+        @info "Calculated reflection matrix $i"
         append!(REF, [R])
         append!(DCHLT, [qs[i]^2 * 0.5*PEN[i+1]*(I + R)])
         append!(NMANN, [0.5*PEN[i+1]*(I - R)])

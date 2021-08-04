@@ -105,7 +105,7 @@ function Assets(geoinit::Function, phys_ref::Vector{Float64}, Nz::Int64, ds::Flo
     FLXAVG = +(rows...) / size(lcfs_pts)[2]
 
     # define TRGT
-    TRGT = f_to_grid((x, y) -> sign(poly_dist(x, y, trgt_splitter)), grd)
+    TRGT = f_to_grid((x, y) -> sign(poly_dist(x, y, trgt_splitter)[1]), grd)
 
     return Assets(grd, Dx, Dy, Dxy, Dxx, Dyy, Dxxx, Dyyy, Dxxy, Dxyy, Ds, Dss,
                      DIFF_lnn, DIFF_lnTe, DIFF_lnTi, DIFF_u, DIFF_w, DIFF_A,
@@ -117,33 +117,35 @@ end
 
 function simple_solovev_assets(Nx, Ny, A, ep, ka, del, L, R0, n0, T0, B0)
 
-    phys_ref = [ep*R0, n0, T0, B0]
+    phys_ref = [ep*R0, R0, n0, T0, B0]
 
-    Assets(phys_ref, 1, 0.001, 0.001) do
+    Assets(phys_ref, 1, 0.05, 0.001) do
 
-        psi, bx, by, bz = solovev_flux_function(A, del, ep, ka, 1.0)
+        psi, bx, by, bz = solovev_flux_function(A, del, ep, ka, 100)
+        bxp(x,y) = bx(x,y) / norm([bx(x,y), by(x,y)])
+        byp(x,y) = by(x,y) / norm([bx(x,y), by(x,y)])
         psi_in = psi(1 - ep + L, 0)
         psi_out = 0
 
         inner_flux_surface = Barrier() do
-            rmap(x, y) = trace_reflection(x, y, psi, bx, by, psi_in, 0.001)
+            rmap(x, y) = trace_reflection(x, y, psi, bxp, byp, psi_in, 0.005)
             psi, psi_in, rmap
         end
 
         outer_flux_surface = Barrier() do
-            rmap(x, y) = trace_reflection(x, y, psi, bx, by, psi_out, 0.001)
+            rmap(x, y) = trace_reflection(x, y, psi, bxp, byp, psi_out, 0.001)
             psi, psi_out, rmap
         end
 
         bars = [inner_flux_surface, outer_flux_surface, Everywhere()]
-        bigdeltas = [1, -1, 1] * L/2
+        bigdeltas = [1, -1, 1] * abs(psi_in) * 1.5
         grd = Grid(Nx, Ny, 1) do
-            r0 = [0.01, -(ka*ep + L)]
-            r1 = [1 + ep+L, ka*ep + L]
+            r0 = [0.01, -(ka*ep + 5*L)]
+            r1 = [1 + ep+L, ka*ep + 5*L]
             (x,y) -> check_if_inside(x, y, bigdeltas, bars), r0, r1
         end
 
-        # return grd
+        # return grd, bars, psi
 
         @info "Generated Grid"
 
@@ -166,9 +168,9 @@ function simple_solovev_assets(Nx, Ny, A, ep, ka, del, L, R0, n0, T0, B0)
         trgt_splitter = Float64[0 1; 0 1]
 
         # define constant source for now
-        Sn = f_to_grid((x,y) -> 1/(100*dt), grd)
-        STe = f_to_grid((x,y) -> 1/(100*dt), grd)
-        STi = f_to_grid((x,y) -> 1/(100*dt), grd)
+        Sn = f_to_grid((x,y) -> 1/(100*0.001), grd)
+        STe = f_to_grid((x,y) -> 1/(100*0.001), grd)
+        STi = f_to_grid((x,y) -> 1/(100*0.001), grd)
 
         grd, bdry, lcfs_pts, trgt_splitter, [Sn, STe, STi], bx, by, bz
     end

@@ -31,7 +31,9 @@ function fieldline_derivatives(bx::Function, by::Function, bz::Function, ds::Flo
 
     # compute forward and backward maps
     FM, dS1 = fieldline_map_matrix(bx, by, bz, ds, mx, my, MinvT, Nz, grd)
+    @info "Calculated forward map."
     BM, dS2 = fieldline_map_matrix(bx, by, bz, -ds, mx, my, MinvT, Nz, grd)
+    @info "Calculated backward map."
 
     # make diagonal matrices for distance coefficients
     _A = Diagonal(-dS1 ./ (dS2.^2 + dS1.*dS2))

@@ -302,14 +302,14 @@ function solovev_flux_function(A, delta, epsilon, kappa, B0; upsep=[0,0], downse
     psi(x,y) = solovev_particular_psi(A,x,y) .+ dot(c, [p(x,y) for p in psifunctions])
 
     Bx(x, y) = ForwardDiff.derivative(u -> -psi(x,u), y)
-    By(x, y) = ForwardDiff.derivative(u -> psi(u,y), x) #XXX changed the sign of this to make consistent with trace.jl, should check later which way is actually correct. 
+    By(x, y) = ForwardDiff.derivative(u -> psi(u,y), x) #XXX changed the sign of this to make consistent with trace.jl, should check later which way is actually correct.
     # B0 = R0^4*B0^2/psi0^2
     Bphi(x,y) = (B0^2 - 2*A*psi(x,y))^(1/2)
     B(x,y) = norm(Float64[Bx(x,y), By(x,y), Bphi(x,y)])
 
     bx(x,y) = Bx(x,y) / B(x,y)
     by(x,y) = By(x,y) / B(x,y)
-    bz(x,y) = Bpsi(x,y) / B(x,y)
+    bz(x,y) = Bphi(x,y) / B(x,y)
 
     return psi, bx, by, bz
 end

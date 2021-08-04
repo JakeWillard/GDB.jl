@@ -132,13 +132,13 @@ function save_assets(fid, a::Assets, name::String)
 
     # save remaining assorted data
     save_sparse_matrix(fid, a.FLXAVG, "($name)/FLXAVG")
-    fid["$(name)/TRGT"][:] = a.TRGT[:]
-    fid["$(name)/Sn"][:] = a.Sn[:]
-    fid["$(name)/STe"][:] = a.STe[:]
-    fid["$(name)/STi"][:] = a.STi[:]
-    fid["$(name)/params"][:] = a.params[:]
-    fid["$(name)/dt"][:] = Float64[a.dt]
-    fid["$(name)/N_subcycle"][:] = Int64[a.N_subcycle]
+    fid["$(name)/TRGT"] = a.TRGT[:]
+    fid["$(name)/Sn"] = a.Sn[:]
+    fid["$(name)/STe"] = a.STe[:]
+    fid["$(name)/STi"] = a.STi[:]
+    fid["$(name)/params"] = a.params[:]
+    fid["$(name)/dt"] = Float64[a.dt]
+    fid["$(name)/N_subcycle"] = Int64[a.N_subcycle]
     # fid["$(name)/seed"][:] = a.seed[:]
 
     @info "Assets '$(name)' saved to disk."
