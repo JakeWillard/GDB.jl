@@ -10,6 +10,7 @@ struct Grid
     Nz :: Int64
     _Nx :: Int64
     _Ny :: Int64
+    _Nbuffer :: Int64
     _nan_outside_boundaries :: Matrix{Float64}
 
 end
@@ -23,8 +24,8 @@ function Grid(is_inside::Function, r0::Vector{Float64}, r1::Vector{Float64}, Nx:
     dx = deltaX / Nx
     dy = deltaY / Ny
 
-    _Nx = Nx + Nbuffer
-    _Ny = Ny + Nbuffer
+    _Nx = Nx + 2*Nbuffer
+    _Ny = Ny + 2*Nbuffer
 
     points = zeros(Float64, (2, Nx*Ny))
     proj_rows = Int32[i for i=1:Nx*Ny]
@@ -49,12 +50,12 @@ function Grid(is_inside::Function, r0::Vector{Float64}, r1::Vector{Float64}, Nx:
     end
 
     Proj = sparse(proj_rows[1:k], proj_cols[1:k], proj_vals[1:k], k, _Nx*_Ny)
-    return Grid(r0, points[:,1:k], Proj, dx, dy, k, Nz, _Nx, _Ny, _nan_outside_boundaries)
+    return Grid(r0, points[:,1:k], Proj, dx, dy, k, Nz, _Nx, _Ny, Nbuffer, _nan_outside_boundaries)
 end
 
 
 # constructor for cases where the "do-block" syntax might make the code more readable
-Grid(f::Function, Nx, Ny, Nz) = Grid(f()..., Nx, Ny, Nz)
+Grid(f::Function, Nx, Ny, Nz; Nbuffer=100) = Grid(f()..., Nx, Ny, Nz; Nbuffer=Nbuffer)
 
 
 function vec_to_mesh(vec, grd::Grid)

@@ -48,8 +48,8 @@ function interpolation_row(x, y, mx, my, MinvT, grd::Grid)
 
     # indices for center point in grid
     # NOTE: the addition of 1e-5 before calling floor is to compensate for annoying floating point imprecision.
-    icg = Int(floor((x - x0)/dx + 1e-5)) + 1
-    jcg = Int(floor((y - y0)/dy + 1e-5)) + 1
+    icg = Int(floor((x - x0)/dx + 1e-5)) + 1 + grd._Nbuffer
+    jcg = Int(floor((y - y0)/dy + 1e-5)) + 1 + grd._Nbuffer
 
     # values for row
     xr = (x - x0)/dx - (icg - 1)
