@@ -29,3 +29,15 @@ function cluster_points(centers::Matrix{Float64}, grd::Grid)
 
     return points, sparse(is, js, dat, grd.Nk, grd.Nk)
 end
+
+
+function sort_by_angle(grd::Grid, r0)
+
+    thetas = Float64[atan(grd.points[2,i]-r0[2], grd.points[1,i]-r0[1]) for i=1:grd.Nk]
+
+    is = Int64[1:grd.Nk...]
+    js = sortperm(thetas)
+    dat = ones(Int64, grd.Nk)
+
+    return grd.points[:,js], sparse(is, js, dat, grd.Nk, grd.Nk)
+end
