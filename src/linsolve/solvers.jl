@@ -6,9 +6,8 @@ struct LinearLeftHandSide
     M :: SparseMatrixCSC
     D :: SparseMatrixCSC
 
-    LinearLeftHandSide(A::SparseMatrixCSC, w::Float64) = new(A, compute_jacobi_matrices(A, w)...)
 end
-
+LinearLeftHandSide(A::SparseMatrixCSC, w::Float64) = LinearLeftHandSide(A, compute_jacobi_matrices(A, w)...)
 
 
 

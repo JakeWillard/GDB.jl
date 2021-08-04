@@ -16,9 +16,15 @@ end
 
 function load_sparse_matrix(fid, name::String)
 
-    Is = fid["$(name)_Is"][:]
-    Js = fid["$(name)_Js"][:]
-    Vs = fid["$(name)_Vs"][:]
+    if isempty(fid["$(name)_Is"])
+        Is = Int32[1]
+        Js = Int32[1]
+        Vs = Float64[0]
+    else
+        Is = fid["$(name)_Is"][:]
+        Js = fid["$(name)_Js"][:]
+        Vs = fid["$(name)_Vs"][:]
+    end
     n, m = fid["$(name)_size"][:]
 
     @info "Loaded Sparse Matrix '$(name)'."
@@ -80,7 +86,7 @@ function load_lhs(fid, name::String)
     D = load_sparse_matrix(fid, "$(name)/D")
 
     @info "Loaded LHS '$(name)'."
-
+    return LinearLeftHandSide(A, M, D)
 end
 
 
