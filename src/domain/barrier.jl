@@ -25,9 +25,9 @@ function smoothstep(x, y, delta, bar::Barrier)
 end
 
 
-function reflection(x, y, delta, bar::Barrier)
+function reflection(x, y, bar::Barrier)
 
-    if smoothstep(x, y, delta, bar) < 1
+    if smoothstep(x, y, 0.0001, bar) < 0.5
         return bar.rmap(x, y)
     else
         return x, y
