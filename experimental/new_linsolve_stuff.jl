@@ -20,15 +20,6 @@ end
 
 
 
-
-# struct BoundaryCondition
-#
-#     Proj :: SparseMatrixCSC
-#     R :: SparseMatrixCSC
-#
-# end
-
-
 struct GhostConditions
 
     Proj :: SparseMatrixCSC
@@ -65,12 +56,12 @@ function GhostConditions(mx, my, MinvT, parities::Vector{Int64}, bars::Vector{Ba
             row_dat, row_j = interpolation_row(x, y, mx, my, MinvT, grd)
             js = [js; row_j]
             dat = [dat; par*row_dat]
-            j_proj = [j_proj; k]
         else
 
             row_dat, row_j = interpolation_row(grd.points[:,k]..., mx, my, MinvT, grd)
             js = [js; row_j]
             dat = [dat; row_dat]
+            j_proj = [j_proj; k]
         end
     end
 
@@ -96,51 +87,41 @@ function swap_parity(gc::GhostConditions, inds...)
 end
 
 
+function extrapolate_ghosts(x::Vector{Float64}, xb::Vector{Float64}, gc::GhostConditions)
+
+    return gc.R*transpose(gc.Proj)*x - (I - gc.R)*xb
+end
 
 
+function require_boundary_conditions(A::SparseMatrixCSC, gc::GhostConditions)
 
-# function BoundaryCondition(condition_type::Int64, mx, my, MinvT, orientation::Int64, bar::Barrier, grd::Grid)
-#
-#     is_r = Int64[]
-#     js_r = Int64[]
-#     dat_r = Float64[]
-#
-#     is_p = Int64[1:grd.Nk...]
-#     js_p = Int64[]
-#     dat_p = ones(Float64, grd.Nk)
-#
-#     if condition_type == 1
-#         parity = -1   # Dirichlet-like condition
-#     elseif condition_type == 2
-#         parity = 1    # Neumann-like condition
-#     else
-#         @error "Invalid condition type"
-#     end
-#
-#     ng = 0
-#     for k=1:grd.Nk
-#         if smoothstep(grd.points[:,k]..., orientation, bar) < 0.5
-#             ng += 1
-#             x, y = bar.rmap(grd.points[:,k]...)
-#             row_dat, row_j = interpolation_row(x, y, mx, my, MinvT, grd)
-#
-#             is_r = [is_r; [k for _=1:mx*my]]
-#             js_r = [js_r; row_j]
-#             dat_r = [dat_r; parity * row_dat]
-#
-#             js_p = [js_p; k]
-#         else
-#             row_dat, row_j = interpolation_row(grd.points[:,k]..., mx, my, MinvT, grd)
-#             is_r = [is_r; [k for _=1:mx*my]]
-#             js_r = [js_r; row_j]
-#             dat_r = [dat_r; row_dat]
-#         end
-#
-#     end
-#     @info "Number of ghosts:" ng
-#
-#     R = sparse(is_r, js_r, dat_r, grd.Nk, grd._Nx*grd._Ny) * transpose(grd.Proj)
-#     P = sparse(is_p[1:ng], js_p, dat_p[1:ng], ng, grd.Nk)
-#
-#     return BoundaryCondition(P, R)
-# end
+    P = gc.Proj
+    Pt = transpose(P)
+
+    Anew = P*A*gc.R*Pt
+    Bterm = P*A*(I - gc.R)
+
+    return Anew, Bterm
+end
+
+
+function require_boundary_conditions(L::LinearMap, xb::Vector{Float64}, gc::GhostConditions)
+
+    Anew, Bterm = require_boundary_conditions(L.M, gc)
+    fnew = gc.Proj*L.f + Bterm*xb
+
+    return LinearMap(Anew, fnew)
+end
+
+
+function solve_pde(A::SparseMatrixCSC, b::Vector{Float64}, xb::Vector{Float64}, gc::GhostConditions)
+
+    L = LinearMap(A, -b)
+    Lnew = require_boundary_conditions(L, xb, gc)
+
+    A = transpose(Lnew.M) * Lnew.M
+    f = -transpose(Lnew.M) * Lnew.f
+    x = A \ f
+
+    return extrapolate_ghosts(x, xb, gc)
+end
