@@ -26,7 +26,7 @@ struct StreamTensor
 end
 
 
-function CreateStreamTensor(Nx, Ny)
+function PeriodicStreamTensor(Nx, Ny)
 
     Fx = spdiagm(-1 => ones(Nx - 1))
     Fx[1,Nx] = 1
@@ -54,26 +54,56 @@ function CreateStreamTensor(Nx, Ny)
 end
 
 
-function Base.:*(S::StreamTensor, f::Array{Float64, 3})
+function BounceBackStreamTensor(Nx, Ny)
+
+    Fx = spdiagm(-1 => ones(Nx - 1))
+    Fx[Nx,Nx-1] = -1
+    Bx = spdiagm(1 => ones(Nx - 1))
+    Bx[1,2] = -1
+
+    Fy = spdiagm(-1 => ones(Ny - 1))
+    Fy[Ny,Ny-1] = -1
+    By = spdiagm(1 => ones(Ny - 1))
+    By[1,2] = -1
+
+    Ix = sparse(I, Nx, Nx)
+    Iy = sparse(I, Ny, Ny)
+
+    E = kron(Iy, Fx)
+    SE = kron(By, Fx)
+    S = kron(By, Ix)
+    SW = kron(By, Bx)
+    W = kron(Iy, Bx)
+    NW = kron(Fy, Bx)
+    N = kron(Fy, Ix)
+    NE = kron(Fy, Fx)
+
+    return StreamTensor(E, SE, S, SW, W, NW, N, NE)
+end
+
+
+function Base.:*(S::StreamTensor, f::Matrix{Float64})
 
     out = zeros(size(f))
 
-    out[:,:,1] = f[:,:,1]
-    out[:,:,2] = S.E * f[:,:,2]
-    out[:,:,3] = S.N * f[:,:,3]
-    out[:,:,4] = S.W * f[:,:,4]
-    out[:,:,5] = S.S * f[:,:,5]
-    out[:,:,6] = S.NE * f[:,:,6]
-    out[:,:,7] = S.NW * f[:,:,7]
-    out[:,:,8] = S.SW * f[:,:,8]
-    out[:,:,9] = S.SE * f[:,:,9]
+    out[:,1] = f[:,1]
+    out[:,2] = S.E * f[:,2]
+    out[:,3] = S.N * f[:,3]
+    out[:,4] = S.W * f[:,4]
+    out[:,5] = S.S * f[:,5]
+    out[:,6] = S.NE * f[:,6]
+    out[:,7] = S.NW * f[:,7]
+    out[:,8] = S.SW * f[:,8]
+    out[:,9] = S.SE * f[:,9]
 
     return out
 end
 
 
-function lattice_boltzmann_method(xres, yres, f, N, tau, c, count=0)
+function lattice_boltzmann_method(xres, yres, f, N, tau, deltax, deltat, count=0)
     # vector at each point with nine dimensions corresponding to each direction 0-8
+    c = deltax/deltat
+
     ftransform = zeros(xres*yres, 9)
     for j=1:yres
         for i=1:xres
@@ -81,7 +111,7 @@ function lattice_boltzmann_method(xres, yres, f, N, tau, c, count=0)
         end
     end
     
-    stensor = CreateStreamTensor(xres, yres)
+    stensor = PeriodicStreamTensor(xres, yres)
     fnewtransform = stensor * ftransform
 
     fnew = zeros(xres, yres, 9)
@@ -90,103 +120,6 @@ function lattice_boltzmann_method(xres, yres, f, N, tau, c, count=0)
             fnew[i,j,:] = fnewtransform[(j-1)*xres+i,:]
         end
     end
-
-    """for i=1:xres
-        for j=1:yres
-            # periodic boundary conditions - checking if at corners/edges to ensure no out of bounds
-            if i==1 && j==1
-                fnew[i,j,1] = f[i,j,1]
-                fnew[i,j,2] = f[xres,j,2]
-                fnew[i,j,3] = f[i,j+1,3]
-                fnew[i,j,4] = f[i+1,j,4]
-                fnew[i,j,5] = f[i,yres,5]
-                fnew[i,j,6] = f[xres,j+1,6]
-                fnew[i,j,7] = f[i+1,j+1,7]
-                fnew[i,j,8] = f[i+1,yres,8]
-                fnew[i,j,9] = f[xres,yres,9]
-            elseif i==1 && j==yres
-                fnew[i,j,1] = f[i,j,1]
-                fnew[i,j,2] = f[xres,j,2]
-                fnew[i,j,3] = f[i,1,3]
-                fnew[i,j,4] = f[i+1,j,4]
-                fnew[i,j,5] = f[i,j-1,5]
-                fnew[i,j,6] = f[xres,1,6]
-                fnew[i,j,7] = f[i+1,1,7]
-                fnew[i,j,8] = f[i+1,j-1,8]
-                fnew[i,j,9] = f[xres,j-1,9]
-            elseif i==xres && j==1
-                fnew[i,j,1] = f[i,j,1]
-                fnew[i,j,2] = f[i-1,j,2]
-                fnew[i,j,3] = f[i,j+1,3]
-                fnew[i,j,4] = f[1,j,4]
-                fnew[i,j,5] = f[i,yres,5]
-                fnew[i,j,6] = f[i-1,j+1,6]
-                fnew[i,j,7] = f[1,j+1,7]
-                fnew[i,j,8] = f[1,yres,8]
-                fnew[i,j,9] = f[i-1,yres,9]
-            elseif i==xres && j==yres
-                fnew[i,j,1] = f[i,j,1]
-                fnew[i,j,2] = f[i-1,j,2]
-                fnew[i,j,3] = f[i,1,3]
-                fnew[i,j,4] = f[1,j,4]
-                fnew[i,j,5] = f[i,j-1,5]
-                fnew[i,j,6] = f[i-1,1,6]
-                fnew[i,j,7] = f[1,1,7]
-                fnew[i,j,8] = f[1,j-1,8]
-                fnew[i,j,9] = f[i-1,j-1,9]
-            elseif i==1
-                fnew[i,j,1] = f[i,j,1]
-                fnew[i,j,2] = f[xres,j,2]
-                fnew[i,j,3] = f[i,j+1,3]
-                fnew[i,j,4] = f[i+1,j,4]
-                fnew[i,j,5] = f[i,j-1,5]
-                fnew[i,j,6] = f[xres,j+1,6]
-                fnew[i,j,7] = f[i+1,j+1,7]
-                fnew[i,j,8] = f[i+1,j-1,8]
-                fnew[i,j,9] = f[xres,j-1,9]
-            elseif i==xres
-                fnew[i,j,1] = f[i,j,1]
-                fnew[i,j,2] = f[i-1,j,2]
-                fnew[i,j,3] = f[i,j+1,3]
-                fnew[i,j,4] = f[1,j,4]
-                fnew[i,j,5] = f[i,j-1,5]
-                fnew[i,j,6] = f[i-1,j+1,6]
-                fnew[i,j,7] = f[1,j+1,7]
-                fnew[i,j,8] = f[1,j-1,8]
-                fnew[i,j,9] = f[i-1,j-1,9]
-            elseif j==1
-                fnew[i,j,1] = f[i,j,1]
-                fnew[i,j,2] = f[i-1,j,2]
-                fnew[i,j,3] = f[i,j+1,3]
-                fnew[i,j,4] = f[i+1,j,4]
-                fnew[i,j,5] = f[i,yres,5]
-                fnew[i,j,6] = f[i-1,j+1,6]
-                fnew[i,j,7] = f[i+1,j+1,7]
-                fnew[i,j,8] = f[i+1,yres,8]
-                fnew[i,j,9] = f[i-1,yres,9]
-            elseif j==yres
-                fnew[i,j,1] = f[i,j,1]
-                fnew[i,j,2] = f[i-1,j,2]
-                fnew[i,j,3] = f[i,1,3]
-                fnew[i,j,4] = f[i+1,j,4]
-                fnew[i,j,5] = f[i,j-1,5]
-                fnew[i,j,6] = f[i-1,1,6]
-                fnew[i,j,7] = f[i+1,1,7]
-                fnew[i,j,8] = f[i+1,j-1,8]
-                fnew[i,j,9] = f[i-1,j-1,9]
-            else
-                fnew[i,j,1] = f[i,j,1]
-                fnew[i,j,2] = f[i-1,j,2]
-                fnew[i,j,3] = f[i,j+1,3]
-                fnew[i,j,4] = f[i+1,j,4]
-                fnew[i,j,5] = f[i,j-1,5]
-                fnew[i,j,6] = f[i-1,j+1,6]
-                fnew[i,j,7] = f[i+1,j+1,7]
-                fnew[i,j,8] = f[i+1,j-1,8]
-                fnew[i,j,9] = f[i-1,j-1,9]
-            end
-        end
-    end"""
 
     rho = zeros((xres, yres))
     for i=1:xres
@@ -201,13 +134,24 @@ function lattice_boltzmann_method(xres, yres, f, N, tau, c, count=0)
     for i=1:xres
         for j=1:yres
             for k=1:9
-                u[i,j,k] = c*fnew[i,j,k]/rho[i,j]
+                u[i,j,k] = fnew[i,j,k]/rho[i,j]
+                # u[i,j,k] = c*fnew[i,j,k]/rho[i,j]
             end
         end
     end
 
     w = zeros(9)
-    w[1] = 4/9
+    w[1] = 0
+    w[2] = c
+    w[3] = c
+    w[4] = c
+    w[5] = c
+    w[6] = c
+    w[7] = c
+    w[8] = c
+    w[9] = c
+
+    """w[1] = 4/9
     w[2] = 1/9
     w[3] = 1/9
     w[4] = 1/9
@@ -215,7 +159,7 @@ function lattice_boltzmann_method(xres, yres, f, N, tau, c, count=0)
     w[6] = 1/36
     w[7] = 1/36
     w[8] = 1/36
-    w[9] = 1/36
+    w[9] = 1/36"""
 
     s = zeros((xres, yres, 9))
     usquared = zeros((xres, yres))
@@ -244,8 +188,9 @@ function lattice_boltzmann_method(xres, yres, f, N, tau, c, count=0)
     for i=1:xres
         for j=1:yres
             for k=1:9
-                fnext[i,j,k] = 1/(1 - 1/tau) * (fnew[i,j,k] - 1/tau*feq[i,j,k])
+                # fnext[i,j,k] = 1/(1 - 1/tau) * (fnew[i,j,k] - 1/tau*feq[i,j,k])
                 # fnext[i,j,k] = fnew[i,j,k] - (1/tau)*(fnew[i,j,k]-feq[i,j,k])
+                fnext[i,j,k] = fnew[i,j,k] - (deltat/(tau+.5*deltat))*(fnew[i,j,k]-feq[i,j,k])
             end
         end
     end
@@ -258,8 +203,8 @@ function lattice_boltzmann_method(xres, yres, f, N, tau, c, count=0)
     end
 end
 
-xres = Int32(100)
-yres = Int32(100)
+xres = Int32(200)
+yres = Int32(200)
 # gaussian distribution in x and y?
 fgauss = zeros(xres, yres, 9)
 for i=1:xres
@@ -279,13 +224,13 @@ for i=1:xres
     end
 end
 
-N = 100
-tau = 1000
-deltax = 10000
+N = 200
+tau = 10000
+deltax = 1
 deltat = 1
 c = deltax/deltat
 
-f = lattice_boltzmann_method(xres, yres, fgauss, N, tau, c)
+"""f = lattice_boltzmann_method(xres, yres, fgauss, N, tau, deltax, deltat)
 fplot = zeros(xres, yres)
 f0 = zeros(xres, yres)
 for i=1:xres
@@ -296,10 +241,10 @@ for i=1:xres
         f0[i,j] = f[i,j,5]
     end
 end
-
+"""
 
 anim = @animate for i=1:N
-    fsine = lattice_boltzmann_method(xres, yres, fsine, 1, tau, c)
+    fsine = lattice_boltzmann_method(xres, yres, fsine, 1, tau, deltax, deltat)
     fplot = zeros(xres, yres)
     for i=1:xres
         for j=1:yres
