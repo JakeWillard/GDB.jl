@@ -25,8 +25,8 @@ end
 struct GhostConditions
 
     Proj :: SparseMatrixCSC
-    R :: SparseMatrixCSC
-    ghost_indices :: Matrix{Int64}
+    Extr :: SparseMatrixCSC
+    swaps :: Matrix{Float64}
 
 end
 
@@ -36,6 +36,7 @@ function GhostConditions(mx, my, MinvT, bars::Vector{Barrier}, grd::Grid)
     ks = [Int64[] for _=1:length(bars)+1]
     js = [Int64[] for _=1:length(bars)+1]
     dats = [Float64[] for _=1:length(bars)+1]
+    swaps = ones(Float64, (grd.Nk, length(bars)))
     ng = 0
 
     for k=1:grd.Nk
@@ -49,8 +50,18 @@ function GhostConditions(mx, my, MinvT, bars::Vector{Barrier}, grd::Grid)
             # add permutation row
             ks[l] = [ks[l]; k]
 
-            # add reflection rows
+            # compute reflection
             x, y = bars[l].rmap(grd.points[:,k]...)
+
+            # enforce a minimum displacement, otherwise we get intolerable artifacts at the grid scale.
+            dxmin = sqrt(grd.dx^2 + grd.dy^2)
+            dx = Float64[x, y] - grd.points[:,k]
+            if norm(dx) < dxmin
+                x += dxmin*dx[1]/norm(dx)
+                y += dxmin*dx[2]/norm(dx)
+            end
+
+            # add reflection rows
             row_dat, row_j = interpolation_row(x, y, mx, my, MinvT, grd)
             js[l] = [js[l]; row_j]
             dats[l] = [dats[l]; row_dat]
@@ -59,6 +70,9 @@ function GhostConditions(mx, my, MinvT, bars::Vector{Barrier}, grd::Grid)
             row_dat, row_j = interpolation_row(grd.points[:,k]..., mx, my, MinvT, grd)
             js[l] = [js[l]; row_j]
             dats[l] = [dats[l]; row_dat]
+
+            # change swaps
+            swaps[k,l] = -1.0
 
         else
 
@@ -77,12 +91,16 @@ function GhostConditions(mx, my, MinvT, bars::Vector{Barrier}, grd::Grid)
     R = -sparse(N) * M[:, ng+1:end]
 
     # make extrapolation matrix
-    Extr = sparse([1:grd.Nk]..., [1:grd.Nk]..., ones(Float64, grd.Nk), grd.Nk, grd.Nk)
-    Extr[1:ng, ng+1:end] = R
-    Extr[1:ng, 1:ng] .= 0
+    Extr_perm = sparse(Diagonal(ones(Float64, grd.Nk)))
+    Extr_perm = sparse([1:grd.Nk]..., [1:grd.Nk]..., ones(Float64, grd.Nk), grd.Nk, grd.Nk)
+    Extr_perm[1:ng, ng+1:end] = R
+    Extr_perm[1:ng, 1:ng] .= 0
+    Extr = transpose(Perm) * Extr_perm * Perm
 
-    # undo permutation
-    return transpose(Perm) * Extr * Perm
+    # compute projection
+    Proj = sparse([1:grd.Nk-ng...], ks[end], ones(grd.Nk-ng), grd.Nk-ng, grd.Nk)
+
+    return GhostConditions(Proj, Extr, swaps)
 end
 
 
@@ -152,22 +170,19 @@ end
 
 function swap_parity(gc::GhostConditions, inds...)
 
-    S = I + zeros(size(gc.R))
+    Extr = gc.Extr
 
     for i in inds
-        gi = gc.ghost_indices[:,i]
-        gi = gi[gi .> 0]
-        S[gi,:] = -S[gi,:]
+        Extr = Diagonal(gc.swaps[:,i]) * Extr
     end
 
-    R = S * gc.R
-    return GhostConditions(gc.Proj, R, gc.ghost_indices)
+    return GhostConditions(gc.Proj, Extr, gc.swaps)
 end
 
 
 function extrapolate_ghosts(x::Vector{Float64}, xb::Vector{Float64}, gc::GhostConditions)
 
-    return gc.R*transpose(gc.Proj)*x - (I - gc.R)*xb
+    return gc.Extr*transpose(gc.Proj)*x - (I - gc.Extr)*xb
 end
 
 
@@ -176,8 +191,8 @@ function require_boundary_conditions(A::SparseMatrixCSC, gc::GhostConditions)
     P = gc.Proj
     Pt = transpose(P)
 
-    Anew = P*A*gc.R*Pt
-    Bterm = P*A*(I - gc.R)
+    Anew = P*A*gc.Extr*Pt
+    Bterm = P*A*(I - gc.Extr)
 
     return Anew, Bterm
 end
@@ -194,12 +209,8 @@ end
 
 function solve_pde(A::SparseMatrixCSC, b::Vector{Float64}, xb::Vector{Float64}, gc::GhostConditions)
 
-    L = LinearMap(A, -b)
-    Lnew = require_boundary_conditions(L, xb, gc)
-
-    A = transpose(Lnew.M) * Lnew.M
-    f = -transpose(Lnew.M) * Lnew.f
-    x = A \ f
+    L = require_boundary_conditions(LinearMap(A, -b), xb, gc)
+    x = L.M \ -L.f
 
     return extrapolate_ghosts(x, xb, gc)
 end
