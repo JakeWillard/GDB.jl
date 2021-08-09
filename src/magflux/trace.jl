@@ -67,8 +67,8 @@ function trace_reflection(x0, y0, psi, psi_b, ds)
 
     # fx and fy should be unit vectors aligned or anti-aligned with the gradient of psi.
     dir = sign(psi_b - psi(x0, y0))
-    Fx(x,y) = ForwardDiff(u -> psi(u, y), x)
-    Fy(x,y) = ForwardDiff(u -> psi(x, u), y)
+    Fx(x,y) = ForwardDiff.derivative(u -> psi(u, y), x)
+    Fy(x,y) = ForwardDiff.derivative(u -> psi(x, u), y)
     F(x,y) = norm([Fx(x,y), Fy(x,y)])
     fx(x,y) = Fx(x,y) / F(x,y)
     fy(x,y) = Fy(x,y) / F(x,y)
