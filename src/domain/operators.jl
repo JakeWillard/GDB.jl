@@ -94,3 +94,20 @@ function boundary_operators(mx, my, MinvT, deltas::Vector{Float64}, bars::Vector
 
     return PEN, REF, DCHLT, NMANN
 end
+
+
+function line_average(points::Matrix{Float64}, mx::Int64, my::Int64, MinvT::Matrix{Float64}, grd::Grid)
+
+    N = size(points)[2]
+    is = ones(Int64, N*mx*my)
+    js = Int64[]
+    dats = Float64[]
+
+    for i=1:N
+        row_dat, row_j = interpolation_row(points[:,k]..., mx, my, MinvT, grd)
+        js = [js; row_j]
+        dats = [dats; row_dat]
+    end
+
+    return sparse(is, js, dats, 1, grd._Nx*grd._Ny) * transpose(grd.Proj) / N
+end
