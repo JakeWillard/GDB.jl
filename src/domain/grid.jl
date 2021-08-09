@@ -38,7 +38,7 @@ function Grid(is_inside::Function, r0::Vector{Float64}, r1::Vector{Float64}, Nx:
         for i=1:Nx
 
             x = r0[1] + (i-1)*dx
-            y = r0[2] + (j-1)*dx
+            y = r0[2] + (j-1)*dy
             if is_inside(x, y)
                 k += 1
                 points[:,k] = [x, y]
