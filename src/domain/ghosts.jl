@@ -114,7 +114,7 @@ end
 
 function extrapolate_ghosts(x::Vector{Float64}, xb::Vector{Float64}, gc::GhostConditions)
 
-    return gc.Extr*transpose(gc.Proj)*x - (I - gc.Extr)*xb
+    return gc.Extr*transpose(gc.Proj)*x + (I - gc.Extr)*xb
 end
 
 
