@@ -49,19 +49,6 @@ function GhostConditions(mx, my, MinvT, bars::Vector{Barrier}, grd::Grid; w=0.5)
             dats[l] = [dats[l]; 2*row_dat1]
             dats[l] = [dats[l]; -1*row_dat2]
 
-            # enforce a minimum displacement, otherwise we get intolerable artifacts at the grid scale.
-            # dxmin = sqrt(grd.dx^2 + grd.dy^2)
-            # dx = Float64[x, y] - grd.points[:,k]
-            # if norm(dx) < dxmin
-            #     x += dxmin*dx[1]/norm(dx)
-            #     y += dxmin*dx[2]/norm(dx)
-            # end
-
-            # add reflection rows
-            # row_dat, row_j = interpolation_row(x, y, mx, my, MinvT, grd)
-            # js[l] = [js[l]; row_j]
-            # dats[l] = [dats[l]; row_dat]
-
             # add identity rows
             row_dat, row_j = interpolation_row(grd.points[:,k]..., mx, my, MinvT, grd)
             js[l] = [js[l]; row_j]

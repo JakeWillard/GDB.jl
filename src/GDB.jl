@@ -26,12 +26,7 @@ include("./magflux/maps.jl")
 include("./magflux/annalus.jl")
 include("./magflux/solovev.jl")
 
-include("./preprocess/io.jl")
-include("./preprocess/mkassets.jl")
-include("./preprocess/rectangle.jl")
-
 include("./physics/formulas.jl")
-include("./physics/parameters.jl")
 include("./physics/timestep.jl")
 
 
