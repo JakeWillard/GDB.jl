@@ -16,6 +16,7 @@ include("./domain/grid.jl")
 include("./domain/barrier.jl")
 include("./domain/interpolation.jl")
 include("./domain/operators.jl")
+include("./domain/ghosts.jl")
 
 include("./linsolve/gmres.jl")
 include("./linsolve/relaxation.jl")
