@@ -2,7 +2,7 @@
 
 function bval_u(Te, Ti, trgt_sgn, H3)
 
-    cs = srgt_sgn .* sqrt.(Te + Ti)
+    cs = trgt_sgn .* sqrt.(Te + Ti)
 
     return H3 * cs
 end
@@ -11,7 +11,7 @@ end
 function bval_phi(phi, Te, lcfs_avg, H1, H2, H3)
 
     lambda = 2.695
-    phi_in = dot(lcfs_avg, phi)
+    phi_in = dot(lcfs_avg, phi)*ones(length(phi))
     phi_out = 2.695 * Te
 
     return H1*phi_in + (H2 + H3)*phi_out
@@ -21,7 +21,7 @@ end
 function solve_pde(A, b, xb, gc::GhostConditions)
 
     An, B = require_boundary_conditions(A, gc)
-    bn = b - B*xb
+    bn = gc.Proj*b - B*xb
     x = An \ bn
 
     return gc.Extr*transpose(gc.Proj)*x + (I - gc.Extr)*xb
@@ -35,7 +35,7 @@ function solve_diffusion(x, xb, k, Dxx, Dyy, gc::GhostConditions)
 end
 
 
-function solve_vorticity_eqn(phi, phi_b, w, n, lnn_x, lnn_y, Pi_xx, Pi_yy, ad, Dx, Dy, Dxx, Dyy, gc::GhostConditions)
+function solve_vorticity_eqn(phi_b, w, n, lnn_x, lnn_y, Pi_xx, Pi_yy, ad, Dx, Dy, Dxx, Dyy, gc::GhostConditions)
 
     M = Dxx + Dyy + Diagonal(lnn_x) * Dx + Diagonal(lnn_y) * Dy
     b = (w - ad*(Pi_xx + Pi_yy)) ./ n
@@ -210,7 +210,7 @@ function leapfrog!(lnn, lnTe, lnTi, u, w, A, phi, psi, n, Te, Ti, Pe, Pi, j, jn,
     u_Dt = u_total_ion_derivative(Pe_s, Pi_s, G_s, n, Ti, u_c, ev, eg, er, ad)
 
     # evaluate partial derivatives
-    lnn_t = general_partial_derivative(lnn_Dt, lnn_x, lnn_y, lnn_s, phi_x, phi_y, u[:,2]) + Stn
+    lnn_t = general_partial_derivative(lnn_Dt, lnn_x, lnn_y, lnn_s, phi_x, phi_y, u[:,2]) + Sn
     lnTe_t = general_partial_derivative(lnTe_Dt, lnTe_x, lnTe_y, lnTe_s, phi_x, phi_y, u[:,2] - jn / ev) + STe
     lnTi_t = general_partial_derivative(lnTi_Dt, lnTi_x, lnTi_y, lnTi_s, phi_x, phi_y, u[:,2]) + STi
     u_t = general_partial_derivative(u_Dt, u_x, u_y, u_s, phi_x, phi_y, u[:,2])
@@ -252,7 +252,7 @@ function leapfrog!(lnn, lnTe, lnTi, u, w, A, phi, psi, n, Te, Ti, Pe, Pi, j, jn,
     lnn_y = Dy * lnn[:,3]
     Pi_xx = Dxx * Pi
     Pi_yy = Dyy * Pi
-    phi = solve_vorticity_eqn(phi, phi_b, w[:,3], n, lnn_x, lnn_y, Pi_xx, Pi_yy, ad, Dx, Dy, Dxx, Dyy, GC_dchlt)
+    phi = solve_vorticity_eqn(phi_b, w[:,3], n, lnn_x, lnn_y, Pi_xx, Pi_yy, ad, Dx, Dy, Dxx, Dyy, GC_dchlt)
     psi = solve_helmholtz_eqn(A[:,3], de2, Dxx, Dyy, GC_dchlt)
 
     # compute current
@@ -380,7 +380,7 @@ function leapfrog!(lnn, lnTe, lnTi, u, w, A, phi, psi, n, Te, Ti, Pe, Pi, j, jn,
     lnn_y = Dy * lnn[:,3]
     Pi_xx = Dxx * Pi
     Pi_yy = Dyy * Pi
-    phi = solve_vorticity_eqn(phi, phi_b, w[:,3], n, lnn_x, lnn_y, Pi_xx, Pi_yy, ad, Dx, Dy, Dxx, Dyy, GC_dchlt)
+    phi = solve_vorticity_eqn(phi_b, w[:,3], n, lnn_x, lnn_y, Pi_xx, Pi_yy, ad, Dx, Dy, Dxx, Dyy, GC_dchlt)
     psi = solve_helmholtz_eqn(A[:,3], de2, Dxx, Dyy, GC_dchlt)
 
     # compute current
@@ -400,7 +400,8 @@ end
 # integrate N timesteps without saving
 function leapfrog!(N, args...)
 
-    for _=1:N
+    for t=1:N
         leapfrog!(args...)
+        @info "$t"
     end
 end
