@@ -7,13 +7,14 @@ struct Barrier
     func::Function
     val::Float64
     rmap::Function
+    orientation::Int64
 
 end
 
 
 function smoothstep(x, y, delta, bar::Barrier)
 
-    u = (bar.func(x,y) - bar.val) / delta + 0.5
+    u = bar.orientation*(bar.func(x,y) - bar.val) / delta + 0.5
 
     if u < 0
         return 0
@@ -25,9 +26,9 @@ function smoothstep(x, y, delta, bar::Barrier)
 end
 
 
-function reflection(x, y, delta, bar::Barrier)
+function reflection(x, y, bar::Barrier)
 
-    if 0 < smoothstep(x, y, delta, bar) < 1
+    if smoothstep(x, y, 0.0001, bar) < 0.5
         return bar.rmap(x, y)
     else
         return x, y
@@ -56,7 +57,7 @@ function Everywhere()
     func(x, y) = 0
     val = -Inf
     rmap(x, y) = x, y
-    return Barrier(func, val, rmap)
+    return Barrier(func, val, rmap, 1)
 end
 
 
@@ -65,7 +66,7 @@ function Nowhere()
     func(x, y) = 0
     val = Inf
     rmap(x, y) = x, y
-    return Barrier(func, val, rmap)
+    return Barrier(func, val, rmap, 1)
 end
 
 
@@ -136,5 +137,10 @@ function PolyBarrier(vert)
         return ray_reflection(x, y, r1, r2)
     end
 
-    return Barrier(func, 0.0, rmap)
+    return Barrier(func, 0.0, rmap, 1)
 end
+
+
+# constructors for cases where the "do-block" syntax might make the code more readable
+Barrier(f::Function) = Barrier(f()...)
+PolyBarrier(f::Function) = PolyBarrier(f())

@@ -1,9 +1,3 @@
-using Base: Float64
-# solutions to Grad-Shafranov using Solov'ev profiles
-using DifferentialEquations
-using Plots
-using ForwardDiff
-using LinearAlgebra
 
 # store psis in vector and iterate to do derivatives
 
@@ -155,17 +149,7 @@ function solovev_particular_partial_yy(A, xval, yval)
 end
 
 
-A = -.155
-delta = .33
-kappa = 1.7
-epsilon = .32
-
-x = LinRange(.25, 1.75, 200)
-y = LinRange(-.7, .7, 200)
-# tau, x, y = parameterize(200, delta, epsilon, kappa)
-z = zeros(Float64, (200, 200))
-
-function solovev_flux_function(Aval, delta, epsilon, kappa, upsep=[0,0], downsep=[0,0], B0)
+function solovev_flux_function(A, delta, epsilon, kappa, B0; upsep=[0,0], downsep=[0,0])
     alpha = asin(delta)
 
     # last terms are xsep/ysep - can be changed to be inputs if need be
@@ -317,24 +301,15 @@ function solovev_flux_function(Aval, delta, epsilon, kappa, upsep=[0,0], downsep
     psifunctions = solovev_psi_functions()
     psi(x,y) = solovev_particular_psi(A,x,y) .+ dot(c, [p(x,y) for p in psifunctions])
 
-    Bx(x, y) = ForwardDiff.derivative(u -> psi(x,u), y)
-    By(x, y) = ForwardDiff.derivative(u -> -psi(u,y), x)
+    Bx(x, y) = ForwardDiff.derivative(u -> -psi(x,u), y)
+    By(x, y) = ForwardDiff.derivative(u -> psi(u,y), x) #XXX changed the sign of this to make consistent with trace.jl, should check later which way is actually correct.
     # B0 = R0^4*B0^2/psi0^2
     Bphi(x,y) = (B0^2 - 2*A*psi(x,y))^(1/2)
     B(x,y) = norm(Float64[Bx(x,y), By(x,y), Bphi(x,y)])
 
     bx(x,y) = Bx(x,y) / B(x,y)
     by(x,y) = By(x,y) / B(x,y)
-    bz(x,y) = Bpsi(x,y) / B(x,y)
+    bz(x,y) = Bphi(x,y) / B(x,y)
 
     return psi, bx, by, bz
 end
-
-psi = solovev_flux_function(A, delta, epsilon, kappa, [1-1.1*delta*epsilon, 1.1*kappa*epsilon], [0,0])
-for i=1:200
-    for j=1:200
-        z[j,i] = psi(x[i], y[j])
-    end
-end
-
-contour(z, levels=100)

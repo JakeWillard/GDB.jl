@@ -53,9 +53,9 @@ function trace_fieldline(x0, y0, bx, by, bz, ds, deltaPhi)
     z = 0
     deltaS = 0
 
-    while z < deltaPhi
+    while abs(z) < deltaPhi
         x, y, z = rk4_step_3d(x, y, z, bx, by, bz, ds)
-        deltaS += ds
+        deltaS += abs(ds)
     end
 
     return Float64[x, y, deltaS]
@@ -63,33 +63,31 @@ end
 
 
 
-function trace_reflection(x0, y0, psi, bx, by, psi_b, ds)
+function trace_reflection(x0, y0, psi, psi_b, ds)
 
-    # c determines the rotation of b
-    if psi(x0, y0) < psi_b
-        c = 1
-    else
-        c = -1
-    end
-
-    fx(x, y) = c*by(x, y)
-    fy(x, y) = -c*bx(x, y)
+    # fx and fy should be unit vectors aligned or anti-aligned with the gradient of psi.
+    dir = sign(psi_b - psi(x0, y0))
+    Fx(x,y) = ForwardDiff.derivative(u -> psi(u, y), x)
+    Fy(x,y) = ForwardDiff.derivative(u -> psi(x, u), y)
+    F(x,y) = norm([Fx(x,y), Fy(x,y)])
+    fx(x,y) = dir*Fx(x,y) / F(x,y)
+    fy(x,y) = dir*Fy(x,y) / F(x,y)
 
     x = x0
     y = y0
     deltaS = 0
 
-    while c*(psi(x, y) - psi_b) <= 0
+    while dir*(psi_b - psi(x, y)) >= 0
 
         x, y = rk4_step_2d(x, y, fx, fy, ds)
-        deltaS += ds
+        deltaS += abs(ds)
     end
 
     # after reaching boundary, continue tracing distance equal to distance already traced.
     while deltaS >= 0
 
         x, y = rk4_step_2d(x, y, fx, fy, ds)
-        deltaS -= ds
+        deltaS -= abs(ds)
     end
 
     return Float64[x, y]

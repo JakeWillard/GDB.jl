@@ -3,12 +3,14 @@ module GDB
 export test_simulation
 
 using Distributed
+using DistributedArrays
 using SharedArrays
 using LinearAlgebra
 using SparseArrays
 using HDF5
 using ForwardDiff
 using RecipesBase
+using Logging
 
 include("./domain/grid.jl")
 include("./domain/barrier.jl")
@@ -22,8 +24,10 @@ include("./linsolve/solvers.jl")
 include("./magflux/trace.jl")
 include("./magflux/maps.jl")
 include("./magflux/annalus.jl")
+include("./magflux/solovev.jl")
 
-
+include("./physics/formulas.jl")
+include("./physics/timestep.jl")
 
 
 # have placeholder test_simulation for now

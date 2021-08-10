@@ -3,12 +3,12 @@
 @userplot PlotVar
 @recipe function f(pv::PlotVar)
 
-    var, grd, st = pv.args
-    z = vec_to_mesh(var, grd)
+    var, index, grd, st = pv.args
+    z = vec_to_mesh(var, grd)[:,:,index]
     seriestype := st
 
     @series begin
-        z
+        transpose(z)
     end
 end
 
@@ -17,11 +17,11 @@ end
 @recipe function f(pg::PlotGrid)
 
     grd, clr = pg.args
-    z = vec_to_mesh(ones(Float64, grd.Nk), grd)
+    z = vec_to_mesh(ones(Float64, grd.Nk*grd.Nz), grd)[:,:,1]
     seriestype := :heatmap
     fillcolor := clr
     colorbar := false
-    @series begin z end
+    @series begin transpose(z) end
 end
 
 

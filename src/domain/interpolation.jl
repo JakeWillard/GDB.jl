@@ -30,13 +30,13 @@ function stencil2d(mx, my)
         end
     end
 
-    return transpose(inv(M))
+    return Matrix(transpose(inv(M)))
 end
 
 
 function interpolation_row(x, y, mx, my, MinvT, grd::Grid)
 
-    x0, y0 = r0
+    x0, y0 = grd.r0
     dx = grd.dx
     dy = grd.dy
     Nx = grd._Nx
@@ -48,8 +48,8 @@ function interpolation_row(x, y, mx, my, MinvT, grd::Grid)
 
     # indices for center point in grid
     # NOTE: the addition of 1e-5 before calling floor is to compensate for annoying floating point imprecision.
-    icg = Int(floor((x - x0)/dx + 1e-5)) + 1
-    jcg = Int(floor((y - y0)/dy + 1e-5)) + 1
+    icg = Int(floor((x - x0)/dx + 1e-5)) + 1 + grd._Nbuffer
+    jcg = Int(floor((y - y0)/dy + 1e-5)) + 1 + grd._Nbuffer
 
     # values for row
     xr = (x - x0)/dx - (icg - 1)
@@ -74,5 +74,12 @@ end
 
 function interpolation_function(V::Vector{Float64}, mx, my, MinvT, grd::Grid)
 
-    return (x, y) -> dot(V, interpolation_row(x, y, mx, my, MinvT, grd))
+    f(x, y) = begin
+        row_dat, row_js = interpolation_row(x, y, mx, my, MinvT, grd)
+        row = sparse(ones(Int64, mx*my), row_js, row_dat, 1, grd._Nx*grd.Ny) * transpose(grd.Proj)
+
+        return row * V
+    end
+
+    return f
 end
