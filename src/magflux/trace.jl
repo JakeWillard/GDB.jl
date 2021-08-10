@@ -70,8 +70,8 @@ function trace_reflection(x0, y0, psi, psi_b, ds)
     Fx(x,y) = ForwardDiff.derivative(u -> psi(u, y), x)
     Fy(x,y) = ForwardDiff.derivative(u -> psi(x, u), y)
     F(x,y) = norm([Fx(x,y), Fy(x,y)])
-    fx(x,y) = Fx(x,y) / F(x,y)
-    fy(x,y) = Fy(x,y) / F(x,y)
+    fx(x,y) = dir*Fx(x,y) / F(x,y)
+    fy(x,y) = dir*Fy(x,y) / F(x,y)
 
     x = x0
     y = y0
