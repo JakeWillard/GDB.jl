@@ -104,7 +104,7 @@ function line_average(points::Matrix{Float64}, mx::Int64, my::Int64, MinvT::Matr
     dats = Float64[]
 
     for i=1:N
-        row_dat, row_j = interpolation_row(points[:,k]..., mx, my, MinvT, grd)
+        row_dat, row_j = interpolation_row(points[:,i]..., mx, my, MinvT, grd)
         js = [js; row_j]
         dats = [dats; row_dat]
     end

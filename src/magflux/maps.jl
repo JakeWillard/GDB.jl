@@ -58,22 +58,23 @@ function fieldline_derivatives(bx::Function, by::Function, bz::Function, ds::Flo
 end
 
 
-function flux_surface_average(psi::Function, psi_val, Ntheta, mx::Int64, my::Int64, MinvT::Matrix{Float64}, grd::Grid; dr=0.01)
+function flux_surface_average(psi::Function, psi_val, Ntheta, r0::Vector{Float64}, mx::Int64, my::Int64, MinvT::Matrix{Float64}, grd::Grid; dr=0.01)
 
     points = zeros(2, Ntheta)
     thetas = LinRange(0, 2*pi, Ntheta+1)
     for i=1:Ntheta
 
         et = Float64[cos(thetas[i]), sin(thetas[i])]
-        r = dr*et
+        r = r0 + dr*et
         sgn = sign(psi(r...) - psi_val)
 
         while true
             y = r + dr*et
-            if sgn*(psi(r...) - psi_val) < 0
+            if sgn*(psi(y...) - psi_val) < 0
                 points[:,i] = 0.5*(y + r)
                 break
             end
+            r = y
         end
 
     end
