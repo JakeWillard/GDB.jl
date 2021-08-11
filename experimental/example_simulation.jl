@@ -42,6 +42,7 @@ function save_grid(fid, grd::Grid, name::String)
     # save projection
     save_sparse_matrix(fid, grd.Proj, "$(name)/Proj")
     fid["$(name)/r0"] = grd.r0[:]
+    fid["$(name)/r1"] = grd.r1[:]
     fid["$(name)/points"] = grd.points[:,:]
     fid["$(name)/spacing"] = Float64[grd.dx, grd.dy]
     fid["$(name)/_size"] = Int64[grd.Nk, grd.Nz, grd._Nx, grd._Ny, grd._Nbuffer]
@@ -56,6 +57,7 @@ function load_grid(fid, name::String)
 
     Proj = load_sparse_matrix(fid, "$(name)/Proj")
     r0 = fid["$(name)/r0"][:]
+    r1 = fid["$(name)/r1"][:]
     points = fid["$(name)/points"][:,:]
     dx, dy = fid["$(name)/spacing"][:]
     Nk, Nz, Nx, Ny, Nbuffer = fid["$(name)/_size"][:]

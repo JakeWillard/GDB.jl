@@ -2,6 +2,7 @@
 struct Grid
 
     r0 :: Vector{Float64}
+    r1 :: Vector{Float64}
     points :: Matrix{Float64}
     Proj :: SparseMatrixCSC
     dx :: Float64
@@ -50,7 +51,7 @@ function Grid(is_inside::Function, r0::Vector{Float64}, r1::Vector{Float64}, Nx:
     end
 
     Proj = sparse(proj_rows[1:k], proj_cols[1:k], proj_vals[1:k], k, _Nx*_Ny)
-    return Grid(r0, points[:,1:k], Proj, dx, dy, k, Nz, _Nx, _Ny, Nbuffer, _nan_outside_boundaries)
+    return Grid(r0, r1, points[:,1:k], Proj, dx, dy, k, Nz, _Nx, _Ny, Nbuffer, _nan_outside_boundaries)
 end
 
 
