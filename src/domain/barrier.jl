@@ -17,11 +17,11 @@ function smoothstep(x, y, delta, bar::Barrier)
     u = bar.orientation*(bar.func(x,y) - bar.val) / delta + 0.5
 
     if u < 0
-        return 0
+        return 0.0
     elseif 0 < u < 1
         return 3*u^2 - 2*u^3
     else
-        return 1
+        return 1.0
     end
 end
 
