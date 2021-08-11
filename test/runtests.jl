@@ -2,6 +2,7 @@ using GDB
 using Test
 using SparseArrays
 using LinearAlgebra
+using Plots
 
 
 function test_domain()
@@ -31,7 +32,7 @@ function test_domain()
         sin(x)*sin(y)
     end
 
-    fmesh = GDB.vec_to_mesh(fvec, grd)
+    h = heatmap((fvec, grd, 1))
 
     f_func = GDB.interpolation_function(fvec, 2, 2, GDB.stencil2d(2, 2), grd)
 
