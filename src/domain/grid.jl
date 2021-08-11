@@ -77,25 +77,3 @@ function f_to_grid(f::Function, grd::Grid)
 
     return vcat([vec for _=1:grd.Nz]...)
 end
-
-
-function grid_map(f::Function, outsize::Tuple{Int64, Int64}, grd::Grid)
-
-    n, m = outsize
-    output = SharedArray{Float64}((n*grd.Nk,m))
-
-    # @distributed unfortunately only works if nprocs > 1
-    if nprocs() > 1
-        @distributed for i=1:grd.Nk
-            k = 1 + n*(i-1)
-            output[k:k+n-1,:] = f(grd.points[:,i]..., grd)
-        end
-    else
-        for i=1:grd.Nk
-            k = 1 + n*(i-1)
-            output[k:k+n-1,:] = f(grd.points[:,i]..., grd)
-        end
-    end
-
-    return output[:,:]
-end
