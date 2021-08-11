@@ -65,7 +65,7 @@ function load_grid(fid, name::String)
 
     @info "Loaded Grid '$(name)'."
 
-    return Grid(r0, points, Proj, dx, dy, Nk, Nz, Nx, Ny, Nbuffer, NaNs)
+    return Grid(r0, r1, points, Proj, dx, dy, Nk, Nz, Nx, Ny, Nbuffer, NaNs)
 end
 
 
@@ -138,6 +138,8 @@ function example_geometry_setup(path::String, Nx, Ny)
         inside, r0, r1
     end
 
+    @info grd.Nk
+
     # compute penalization values as step functions
     pen = zeros(grd.Nk, 3)
     for i=1:3
@@ -170,23 +172,10 @@ function example_geometry_setup(path::String, Nx, Ny)
     # lcfs average
     lcfs_avg = flux_surface_average(psi, 0.0, 150, Float64[1, 0], 4, 4, stencil2d(4, 4), grd)
 
-    # compute derivatives (need to renormalize since solovev assumes R=1, and we need a=1 consistent with the normalization factors in publications.)
-    Minv = stencil1d(5)
-    MinvT = stencil2d(4, 4)
-    Dx = derivative_matrix(1, 0, Minv, Minv, grd) * 0.3
-    Dy = derivative_matrix(0, 1, Minv, Minv, grd) * 0.3
-    Dxy = derivative_matrix(1, 1, Minv, Minv, grd) * (0.3)^2
-    Dxx = derivative_matrix(2, 0, Minv, Minv, grd) * (0.3)^2
-    Dyy = derivative_matrix(0, 2, Minv, Minv, grd) * (0.3)^2
-    Dxxx = derivative_matrix(3, 0, Minv, Minv, grd) * (0.3)^3
-    Dyyy = derivative_matrix(0, 3, Minv, Minv, grd) * (0.3)^3
-    Dxxy = derivative_matrix(2, 1, Minv, Minv, grd) * (0.3)^3
-    Dxyy = derivative_matrix(1, 2, Minv, Minv, grd) * (0.3)^3
-    Ds, Dss = fieldline_derivatives(bx, by, bz, 0.01, 4, 4, MinvT, 1, grd)
-
+    # trace field-line images
+    img = fieldline_images(bx, by, bz, 0.01, grd)
 
     fid = h5open(path, "w")
-
     save_grid(fid, grd, "Grid")
     save_sparse_matrix(fid, K1, "K1")
     save_sparse_matrix(fid, K2, "K2")
@@ -198,18 +187,7 @@ function example_geometry_setup(path::String, Nx, Ny)
     save_ghost_conditions(fid, GC_u, "GC_u")
     fid["trgt_sgn"] = trgt_sgn[:]
     save_sparse_matrix(fid, lcfs_avg, "lcfs_avg")
-    save_sparse_matrix(fid, Dx, "Dx")
-    save_sparse_matrix(fid, Dy, "Dy")
-    save_sparse_matrix(fid, Dxy, "Dxy")
-    save_sparse_matrix(fid, Dxx, "Dxx")
-    save_sparse_matrix(fid, Dyy, "Dyy")
-    save_sparse_matrix(fid, Dxxx, "Dxxx")
-    save_sparse_matrix(fid, Dyyy, "Dyyy")
-    save_sparse_matrix(fid, Dxxy, "Dxxy")
-    save_sparse_matrix(fid, Dxyy, "Dxyy")
-    save_sparse_matrix(fid, Ds, "Ds")
-    save_sparse_matrix(fid, Dss, "Dss")
-
+    fid["FL_img"] = img[:,:]
     close(fid)
 end
 
@@ -221,16 +199,18 @@ function example_physics_setup(R0, n0, T0, B0, init_path, geo_path)
 
     geofid = h5open(geo_path, "r")
     grd = load_grid(geofid, "Grid")
-    Dx = load_sparse_matrix(geofid, "Dx")
-    Dy = load_sparse_matrix(geofid, "Dy")
-    Dxx = load_sparse_matrix(geofid, "Dxx")
-    Dyy = load_sparse_matrix(geofid, "Dyy")
     GC_dchlt = load_ghost_conditions(geofid, "GC_dchlt")
     lcfs_avg = load_sparse_matrix(geofid, "lcfs_avg")
     H1 = load_sparse_matrix(geofid, "H1")
     H2 = load_sparse_matrix(geofid, "H2")
     H3 = load_sparse_matrix(geofid, "H3")
     close(geofid)
+
+    Minv = stencil1d(5)
+    Dx = derivative_matrix(1, 0, Minv, Minv, grd) * 0.3
+    Dy = derivative_matrix(0, 1, Minv, Minv, grd) * 0.3
+    Dxx = derivative_matrix(2, 0, Minv, Minv, grd) * (0.3)^2
+    Dyy = derivative_matrix(0, 2, Minv, Minv, grd) * (0.3)^2
 
     psi_in = psi(1 - 0.28, 0)
     dp = abs(psi_in)
@@ -298,17 +278,7 @@ function test_simulate(Nt, sn, ste, sti, kdiff, dt, output_path, init_path, geo_
     GC_u = load_ghost_conditions(geofid, "GC_u")
     trgt_sgn = geofid["trgt_sgn"][:]
     lcfs_avg = load_sparse_matrix(geofid, "lcfs_avg")
-    Dx = load_sparse_matrix(geofid, "Dx")
-    Dy = load_sparse_matrix(geofid, "Dy")
-    Dxy = load_sparse_matrix(geofid, "Dxy")
-    Dxx = load_sparse_matrix(geofid, "Dxx")
-    Dyy = load_sparse_matrix(geofid, "Dyy")
-    Dxxx = load_sparse_matrix(geofid, "Dxxx")
-    Dyyy = load_sparse_matrix(geofid, "Dyyy")
-    Dxxy = load_sparse_matrix(geofid, "Dxxy")
-    Dxyy = load_sparse_matrix(geofid, "Dxyy")
-    Ds = load_sparse_matrix(geofid, "Ds")
-    Dss = load_sparse_matrix(geofid, "Dss")
+    FL_img = geofid["FL_img"][:,:]
     close(geofid)
 
     fid = h5open(init_path, "r")
@@ -331,6 +301,19 @@ function test_simulate(Nt, sn, ste, sti, kdiff, dt, output_path, init_path, geo_
     am, ad, ki, ke, er, eg, ev, de2, eta = fid["params"][:]
     close(fid)
 
+    Minv = stencil1d(5)
+    MinvT = stencil2d(4, 4)
+    Dx = derivative_matrix(1, 0, Minv, Minv, grd) * 0.3
+    Dy = derivative_matrix(0, 1, Minv, Minv, grd) * 0.3
+    Dxy = derivative_matrix(1, 1, Minv, Minv, grd) * (0.3)^2
+    Dxx = derivative_matrix(2, 0, Minv, Minv, grd) * (0.3)^2
+    Dyy = derivative_matrix(0, 2, Minv, Minv, grd) * (0.3)^2
+    Dxxx = derivative_matrix(3, 0, Minv, Minv, grd) * (0.3)^3
+    Dyyy = derivative_matrix(0, 3, Minv, Minv, grd) * (0.3)^3
+    Dxxy = derivative_matrix(2, 1, Minv, Minv, grd) * (0.3)^3
+    Dxyy = derivative_matrix(1, 2, Minv, Minv, grd) * (0.3)^3
+    Ds, Dss = fieldline_derivatives(FL_img, 4, 4, MinvT, grd)
+
     Sn = sn * Sp
     STe = ste * Sp
     STi = sti * Sp
@@ -344,5 +327,5 @@ function test_simulate(Nt, sn, ste, sti, kdiff, dt, output_path, init_path, geo_
         # ;alksdjfl;kasjfl;sk
     end
 
-    return n, grd, GC_nmann
+    return n, grd
 end
