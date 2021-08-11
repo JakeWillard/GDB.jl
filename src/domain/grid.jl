@@ -32,7 +32,7 @@ function Grid(is_inside::Function, r0::Vector{Float64}, r1::Vector{Float64}, Nx:
     proj_rows = Int32[i for i=1:Nx*Ny]
     proj_cols = zeros(Int32, Nx*Ny)
     proj_vals = ones(Int32, Nx*Ny)
-    _nan_outside_boundaries = fill(NaN, (_Nx, _Ny))
+    _nan_outside_boundaries = fill(NaN, (Nx, Ny))
     k = 0
 
     for j=1:Ny
@@ -59,26 +59,16 @@ end
 Grid(f::Function, Nx, Ny, Nz; Nbuffer=100) = Grid(f()..., Nx, Ny, Nz; Nbuffer=Nbuffer)
 
 
-function vec_to_mesh(vec, grd::Grid)
+@recipe function f(t::Tuple{Vector{Float64}, Grid, Int64})
 
+    v, grd, z = t
+    vp = reshape(v, grd.Nk, :)[:,z]
+    vp_cart = transpose(grd.Proj) * vp
+    V = reshape(vp_cart, grd._Nx, grd._Ny)
 
-    vals = kron(sparse(I, grd.Nz, grd.Nz), transpose(grd.Proj)) * vec
-
-    Nx = grd._Nx
-    Ny = grd._Ny
-    Nz = grd.Nz
-    out = zeros(Float64, (Nx, Ny, Nz))
-    for i=1:Nx
-        for j=1:Ny
-            for k=1:Nz
-                l = (i + (j-1)*Nx) + (k-1)*Nx*Ny
-                out[i,j,k] = vals[l] * grd._nan_outside_boundaries[i,j]
-            end
-        end
-    end
-
-    return out
+    V[grd._Nbuffer+1:grd._Nx-grd._Nbuffer, grd._Nbuffer+1:grd._Ny-grd._Nbuffer] .* grd._nan_outside_boundaries
 end
+
 
 
 function f_to_grid(f::Function, grd::Grid)
