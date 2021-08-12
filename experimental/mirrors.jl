@@ -8,7 +8,7 @@ function mirror_image(k, func::Function, grd::Grid)
     k_cart = proj_js[k]
     i = rem(k_cart, grd._Nx)
     j = div(k_cart, grd._Ny)
-    steps = 0
+    dist = 0
 
     while func(x,y) < 0.0
         fs = hcat([[func(x+grd.dx*i, y+grd.dy*j) for i=-1:1] for j=-1:1]...)
@@ -17,16 +17,17 @@ function mirror_image(k, func::Function, grd::Grid)
         y += dj*grd.dy
         i += di
         j += dj
-        steps += 1
+        dist += sqrt(di^2 + dj^2)
     end
 
-    for _=1:steps
+    while dist > 0
         fs = hcat([[func(x+grd.dx*i, y+grd.dy*j) for i=-1:1] for j=-1:1]...)
         di, dj = Tuple(findmax(fs)[2]) .- 2
         x += di*grd.dx
         y += dj*grd.dy
         i += di
         j += dj
+        dist -= sqrt(di^2 + dj^2)
     end
 
     k_cart_new = i + (j-1)*grd._Nx
@@ -69,7 +70,7 @@ end
 
 function BetterGhostConditions(bars::Vector{Barrier}, grd::Grid)
 
-    M = DArray((grd.Nk,), workers(), (length(workers()), length(bars)+2)) do inds
+    M = DArray((grd.Nk,length(bars)+2), workers(), (length(workers()), 1)) do inds
 
         ks = Int64[1:grd.Nk...]
         swaps = ones(Int64, (grd.Nk, length(bars)))
@@ -79,7 +80,7 @@ function BetterGhostConditions(bars::Vector{Barrier}, grd::Grid)
         for i=1:length(ks)
             x, y = grd.points[:,ks[i]]
 
-            flags = Bool[f(x,y) < 0.0 for f in fs]
+            flags = Bool[b.func(x,y) < b.val for b in bars]
             trueflag = findfirst(x->x, flags)
             if isnothing(trueflag)
                 j_mir = [j_mir; ks[i]]
@@ -87,6 +88,7 @@ function BetterGhostConditions(bars::Vector{Barrier}, grd::Grid)
             else
                 swaps[i,trueflag] = -1
                 j_mir = [j_mir; mirror_image(ks[i], (x,y) -> bars[trueflag].func(x,y) - bars[trueflag].val, grd)]
+                j_proj = [j_proj; 0]
             end
 
         end
@@ -96,6 +98,7 @@ function BetterGhostConditions(bars::Vector{Barrier}, grd::Grid)
 
     j_mir = Array(M[:,1])
     j_proj = Array(M[:,2])
+    j_proj = j_proj[j_proj .!= 0]
     swaps = Array(M[:,3:end])
 
     Mirror = sparse([1:grd.Nk...], j_mir, ones(grd.Nk), grd.Nk, grd.Nk)
