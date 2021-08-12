@@ -56,3 +56,80 @@ function mirror_matrix(fs::Vector{Function}, grd::Grid)
 
     return sparse([1:grd.Nk...], Array(js), ones(grd.Nk), grd.Nk, grd.Nk)
 end
+
+
+struct BetterGhostConditions
+
+    Proj :: SparseMatrixCSC
+    Mirror :: SparseMatrixCSC
+    swaps :: Matrix{Int64}
+
+end
+
+
+function BetterGhostConditions(bars::Vector{Barrier}, grd::Grid)
+
+    M = DArray((grd.Nk,), workers(), (length(workers()), length(bars)+2)) do inds
+
+        ks = Int64[1:grd.Nk...]
+        swaps = ones(Int64, (grd.Nk, length(bars)))
+        j_mir = Int64[]
+        j_proj = Int64[]
+
+        for i=1:length(ks)
+            x, y = grd.points[:,ks[i]]
+
+            flags = Bool[f(x,y) < 0.0 for f in fs]
+            trueflag = findfirst(x->x, flags)
+            if isnothing(trueflag)
+                j_mir = [j_mir; ks[i]]
+                j_proj = [j_proj; ks[i]]
+            else
+                swaps[i,trueflag] = -1
+                j_mir = [j_mir; mirror_image(ks[i], (x,y) -> bars[trueflag].func(x,y) - bars[trueflag].val, grd)]
+            end
+
+        end
+
+        hcat(j_mir, j_proj, swaps)
+    end
+
+    j_mir = Array(M[:,1])
+    j_proj = Array(M[:,2])
+    swaps = Array(M[:,3:end])
+
+    Mirror = sparse([1:grd.Nk...], j_mir, ones(grd.Nk), grd.Nk, grd.Nk)
+    Proj = sparse([1:length(j_proj)...], j_proj, ones(length(j_proj)), length(j_proj), grd.Nk)
+
+    return BetterGhostConditions(Proj, Mirror, swaps)
+end
+
+
+function swap_sign(gc::BetterGhostConditions, inds...)
+
+    Mirror = gc.Mirror
+
+    for i in inds
+        Mirror = Diagonal(gc.swaps[:,i]) * Mirror
+    end
+
+    return BetterGhostConditions(gc.Proj, Mirror, gc.swaps)
+end
+
+
+function extrapolate_ghosts(x::Vector{Float64}, xb::Vector{Float64}, gc::BetterGhostConditions)
+
+    return gc.Mirror*transpose(gc.Proj)*x + (I - gc.Mirror)*xb
+end
+
+
+function require_boundary_conditions(A::SparseMatrixCSC, gc::BetterGhostConditions)
+
+    P = gc.Proj
+    Pt = transpose(P)
+
+    Anew = P*A*gc.Mirror*Pt
+    Bterm = P*A*(I - gc.Mirror)
+
+    return Anew, Bterm
+end
