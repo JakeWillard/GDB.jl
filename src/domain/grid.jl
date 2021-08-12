@@ -76,3 +76,7 @@ function f_to_grid(f::Function, grd::Grid)
 
     return vcat([vec for _=1:grd.Nz]...)
 end
+
+
+# ability to call f_to_grid with convenient syntax: vec = f => grid
+Pair(f::Function, grd::Grid) = f_to_grid(f, grd)
