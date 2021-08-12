@@ -76,9 +76,9 @@ function interpolation_function(V::Vector{Float64}, mx, my, MinvT, grd::Grid)
 
     f(x, y) = begin
         row_dat, row_js = interpolation_row(x, y, mx, my, MinvT, grd)
-        row = sparse(ones(Int64, mx*my), row_js, row_dat, 1, grd._Nx*grd.Ny) * transpose(grd.Proj)
+        row = sparse(ones(Int64, mx*my), row_js, row_dat, 1, grd._Nx*grd._Ny) * transpose(grd.Proj)
 
-        return row * V
+        return (row * V)[1]
     end
 
     return f
