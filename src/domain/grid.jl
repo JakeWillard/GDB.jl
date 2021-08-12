@@ -59,9 +59,8 @@ end
 Grid(f::Function, Nx, Ny, Nz; Nbuffer=100) = Grid(f()..., Nx, Ny, Nz; Nbuffer=Nbuffer)
 
 
-@recipe function f(t::Tuple{Vector{Float64}, Grid, Int64})
+@recipe function f(v::Vector{Float64}, grd::Grid, z::Int64)
 
-    v, grd, z = t
     vp = reshape(v, grd.Nk, :)[:,z]
     vp_cart = transpose(grd.Proj) * vp
     V = reshape(vp_cart, grd._Nx, grd._Ny)
