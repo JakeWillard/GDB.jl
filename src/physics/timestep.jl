@@ -24,7 +24,7 @@ function solve_pde(A, b, xb, gc::GhostConditions)
     bn = gc.Proj*b - B*xb
     x = An \ bn
 
-    return gc.Extr*transpose(gc.Proj)*x + (I - gc.Extr)*xb
+    return gc.Mirror*transpose(gc.Proj)*x + (I - gc.Mirror)*xb
 end
 
 
@@ -53,7 +53,7 @@ end
 
 function forward_euler(x, x_t, xb, K1, K2, dt, gc::GhostConditions)
 
-    return (x + dt*(K1*x_t + K2*gc.Extr*xb)) ./ (1 .+ dt*diag(K2))
+    return (x + dt*(K1*x_t + K2*gc.Mirror*xb)) ./ (1 .+ dt*diag(K2))
 end
 
 

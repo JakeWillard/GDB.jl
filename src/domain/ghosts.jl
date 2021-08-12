@@ -1,107 +1,106 @@
 
 
+function mirror_image(k, func::Function, grd::Grid)
+
+    _, proj_js, _ = findnz(grd.Proj)
+
+    x, y = grd.points[:,k]
+    k_cart = proj_js[k]
+    i = rem(k_cart, grd._Nx)
+    j = div(k_cart, grd._Ny)
+    dist = 0
+
+    while func(x,y) < 0.0
+        fs = hcat([[func(x+grd.dx*i, y+grd.dy*j) for i=-1:1] for j=-1:1]...)
+        di, dj = Tuple(findmax(fs)[2]) .- 2
+        x += di*grd.dx
+        y += dj*grd.dy
+        i += di
+        j += dj
+        dist += sqrt(di^2 + dj^2)
+    end
+
+    while dist > 0
+        fs = hcat([[func(x+grd.dx*i, y+grd.dy*j) for i=-1:1] for j=-1:1]...)
+        di, dj = Tuple(findmax(fs)[2]) .- 2
+        x += di*grd.dx
+        y += dj*grd.dy
+        i += di
+        j += dj
+        dist -= sqrt(di^2 + dj^2)
+    end
+
+    k_cart_new = i + (j-1)*grd._Nx
+    knew = findall(x->x==k_cart_new, proj_js)[1]
+
+    return knew
+end
+
 
 struct GhostConditions
 
     Proj :: SparseMatrixCSC
-    Extr :: SparseMatrixCSC
-    swaps :: Matrix{Float64}
+    Mirror :: SparseMatrixCSC
+    swaps :: Matrix{Int64}
 
 end
 
 
-function GhostConditions(mx, my, MinvT, bars::Vector{Barrier}, grd::Grid; w=0.5)
+function GhostConditions(bars::Vector{Barrier}, grd::Grid)
 
-    ks = [Int64[] for _=1:length(bars)+1]
-    js = [Int64[] for _=1:length(bars)+1]
-    dats = [Float64[] for _=1:length(bars)+1]
-    swaps = ones(Float64, (grd.Nk, length(bars)))
-    ng = 0
-    dr = 1.5*sqrt(grd.dx^2 + grd.dy^2)
+    M = DArray((grd.Nk,length(bars)+2), workers(), (length(workers()), 1)) do inds
 
-    for k=1:grd.Nk
-        us = [smoothstep(grd.points[:,k]..., 1.0, bar) for bar in bars]
-        if !isempty(us[us .< 0.5])
+        ks = Int64[1:grd.Nk...]
+        swaps = ones(Int64, (grd.Nk, length(bars)))
+        j_mir = Int64[]
+        j_proj = Int64[]
 
-            us[us .> 0.5] .= -Inf
-            l = sortperm(us)[end]
-            ng += 1
+        for i=1:length(ks)
+            x, y = grd.points[:,ks[i]]
 
-            # add permutation row
-            ks[l] = [ks[l]; k]
+            flags = Bool[b.orientation*(b.func(x,y)-b.val) < 0 for b in bars]
+            trueflag = findfirst(x->x, flags)
+            if isnothing(trueflag)
+                j_mir = [j_mir; ks[i]]
+                j_proj = [j_proj; ks[i]]
+            else
+                swaps[i,trueflag] = -1
+                j_mir = [j_mir; mirror_image(ks[i], (x,y) -> bars[trueflag].orientation*(bars[trueflag].func(x,y) - bars[trueflag].val), grd)]
+                j_proj = [j_proj; 0]
+            end
 
-            # compute reflection
-            x, y = bars[l].rmap(grd.points[:,k]...)
-
-            # for robustness, compute coefficients in terms of neighboring points.
-            dist = Float64[x, y] - grd.points[:,k]
-            er = dist / norm(dist)
-            x1 = x + dr*er[1]
-            x2 = x + 2*dr*er[1]
-            y1 = y + dr*er[2]
-            y2 = y + 2*dr*er[2]
-
-            # add reflection rows
-            row_dat1, row_j1 = interpolation_row(x1, y1, mx, my, MinvT, grd)
-            row_dat2, row_j2 = interpolation_row(x2, y2, mx, my, MinvT, grd)
-            js[l] = [js[l]; row_j1]
-            js[l] = [js[l]; row_j2]
-            dats[l] = [dats[l]; 2*row_dat1]
-            dats[l] = [dats[l]; -1*row_dat2]
-
-            # add identity rows
-            row_dat, row_j = interpolation_row(grd.points[:,k]..., mx, my, MinvT, grd)
-            js[l] = [js[l]; row_j]
-            dats[l] = [dats[l]; row_dat]
-
-            # change swaps
-            swaps[k,l] = -1.0
-
-        else
-
-            # add permutation row
-            ks[end] = [ks[end]; k]
         end
+
+        hcat(j_mir, j_proj, swaps)
     end
 
-    # compute permutation and reflection condition matrix
-    Perm = sparse([1:grd.Nk...], vcat(ks...), ones(grd.Nk), grd.Nk, grd.Nk)
-    M = sparse(vcat([k*ones(3*mx*my) for k=1:ng]...), vcat(js...), vcat(dats...), ng, grd._Nx*grd._Ny) * transpose(grd.Proj) * transpose(Perm)
+    j_mir = Array(M[:,1])
+    j_proj = Array(M[:,2])
+    j_proj = j_proj[j_proj .!= 0]
+    swaps = Array(M[:,3:end])
 
-    # invert to get extrapolation operation, delete small values
-    N = inv(Matrix(M[1:ng, 1:ng]))
-    N[abs.(N) .< 1e-8] .= 0
-    R = -sparse(N) * M[:, ng+1:end]
+    Mirror = sparse([1:grd.Nk...], j_mir, ones(grd.Nk), grd.Nk, grd.Nk)
+    Proj = sparse([1:length(j_proj)...], j_proj, ones(length(j_proj)), length(j_proj), grd.Nk)
 
-    # make extrapolation matrix
-    Extr_perm = sparse(Diagonal(ones(Float64, grd.Nk)))
-    # Extr_perm = sparse([1:grd.Nk]..., [1:grd.Nk]..., ones(Float64, grd.Nk), grd.Nk, grd.Nk) # XXX
-    Extr_perm[1:ng, ng+1:end] = R
-    Extr_perm[1:ng, 1:ng] .= 0
-    Extr = transpose(Perm) * Extr_perm * Perm
-
-    # compute projection
-    Proj = sparse([1:grd.Nk-ng...], ks[end], ones(grd.Nk-ng), grd.Nk-ng, grd.Nk)
-
-    return GhostConditions(Proj, Extr, swaps)
+    return GhostConditions(Proj, Mirror, swaps)
 end
 
 
 function swap_sign(gc::GhostConditions, inds...)
 
-    Extr = gc.Extr
+    Mirror = gc.Mirror
 
     for i in inds
-        Extr = Diagonal(gc.swaps[:,i]) * Extr
+        Mirror = Diagonal(gc.swaps[:,i]) * Mirror
     end
 
-    return GhostConditions(gc.Proj, Extr, gc.swaps)
+    return GhostConditions(gc.Proj, Mirror, gc.swaps)
 end
 
 
 function extrapolate_ghosts(x::Vector{Float64}, xb::Vector{Float64}, gc::GhostConditions)
 
-    return gc.Extr*transpose(gc.Proj)*x + (I - gc.Extr)*xb
+    return gc.Mirror*transpose(gc.Proj)*x + (I - gc.Mirror)*xb
 end
 
 
@@ -110,8 +109,8 @@ function require_boundary_conditions(A::SparseMatrixCSC, gc::GhostConditions)
     P = gc.Proj
     Pt = transpose(P)
 
-    Anew = P*A*gc.Extr*Pt
-    Bterm = P*A*(I - gc.Extr)
+    Anew = P*A*gc.Mirror*Pt
+    Bterm = P*A*(I - gc.Mirror)
 
     return Anew, Bterm
 end

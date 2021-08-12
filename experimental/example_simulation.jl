@@ -75,7 +75,7 @@ function save_ghost_conditions(fid, gc::GhostConditions, name::String)
     create_group(fid, name)
 
     save_sparse_matrix(fid, gc.Proj, "$(name)/Proj")
-    save_sparse_matrix(fid, gc.Extr, "$(name)/Extr")
+    save_sparse_matrix(fid, gc.Mirror, "$(name)/Mirror")
     fid["$(name)/swaps"] = gc.swaps[:,:]
 end
 
@@ -83,10 +83,10 @@ end
 function load_ghost_conditions(fid, name::String)
 
     Proj = load_sparse_matrix(fid, "$(name)/Proj")
-    Extr = load_sparse_matrix(fid, "$(name)/Extr")
+    Mirror = load_sparse_matrix(fid, "$(name)/Mirror")
     swaps = fid["$(name)/swaps"][:,:]
 
-    return GhostConditions(Proj, Extr, swaps)
+    return GhostConditions(Proj, Mirror, swaps)
 end
 
 
@@ -162,7 +162,7 @@ function example_geometry_setup(path::String, Nx, Ny)
     H3 = sparse(Diagonal(h3))
 
     # compute ghost-conditions
-    GC_dchlt = GhostConditions(2, 2, stencil2d(2, 2), barrs, grd)
+    GC_dchlt = GhostConditions(barrs, grd)
     GC_nmann = swap_sign(GC_dchlt, 1, 2, 3)
     GC_u = swap_sign(GC_nmann, 3)
 

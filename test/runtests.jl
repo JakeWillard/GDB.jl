@@ -9,7 +9,7 @@ function test_domain()
 
     bar1 = GDB.Barrier() do
         func(x,y) = x
-        val = 1.0
+        val = 1.8
         rmap(x,y) = 1 - x, y
         func, val, rmap, -1
     end
@@ -32,11 +32,11 @@ function test_domain()
         sin(x)*sin(y)
     end
 
-    h = heatmap((fvec, grd, 1))
+    h = heatmap(fvec, grd, 1)
 
     f_func = GDB.interpolation_function(fvec, 2, 2, GDB.stencil2d(2, 2), grd)
 
-    gc = GDB.GhostConditions(2, 2, GDB.stencil2d(2, 2), [bar1], grd)
+    gc = GDB.GhostConditions([bar1], grd)
     gc2 = GDB.swap_sign(gc, 1)
 
     A = sparse(I, grd.Nk, grd.Nk)
