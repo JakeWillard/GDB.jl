@@ -10,11 +10,11 @@ function fieldline_images(bx::Function, by::Function, bz::Function, ds::Float64,
         points0 = grd.points[:, inds[2]]
         imgpoints = zeros(6, Nk)
 
-        for k=1:Nk
+        @showprogress for k=1:Nk
 
             imgpoints[1:3,k] = trace_fieldline(points0[:,k]..., bx, by, bz, ds, deltaPhi)
             imgpoints[4:6,k] = trace_fieldline(points0[:,k]..., bx, by, bz, -ds, deltaPhi)
-            @info "$k/$Nk"
+            # @info "$k/$Nk"
 
         end
         imgpoints

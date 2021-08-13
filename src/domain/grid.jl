@@ -35,7 +35,7 @@ function Grid(is_inside::Function, r0::Vector{Float64}, r1::Vector{Float64}, Nx:
     _nan_outside_boundaries = fill(NaN, (Nx, Ny))
     k = 0
 
-    for j=1:Ny
+    @showprogress 1 "Generating Grid..." for j=1:Ny
         for i=1:Nx
 
             x = r0[1] + (i-1)*dx

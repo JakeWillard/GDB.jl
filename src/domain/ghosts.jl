@@ -62,7 +62,7 @@ function GhostConditions(bars::Vector{Barrier}, grd::Grid)
         j_proj = Int64[]
         _, proj_js, _ = findnz(grd.Proj)
 
-        for i=1:length(ks)
+        @showprogress "Computing Mirrors..." for i=1:length(ks)
             x, y = grd.points[:,ks[i]]
 
             flags = Bool[b.orientation*(b.func(x,y)-b.val) < 0 for b in bars]
@@ -76,7 +76,7 @@ function GhostConditions(bars::Vector{Barrier}, grd::Grid)
                 j_proj = [j_proj; 0]
             end
 
-            @info "$i/$(length(ks))"
+            # @info "$i/$(length(ks))"
 
         end
 

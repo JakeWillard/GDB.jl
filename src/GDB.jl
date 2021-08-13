@@ -1,8 +1,9 @@
 module GDB
 
-export test_simulation
 
 using Distributed
+
+# @everywhere begin
 using DistributedArrays
 using SharedArrays
 using LinearAlgebra
@@ -11,6 +12,7 @@ using HDF5
 using ForwardDiff
 using RecipesBase
 using Logging
+using ProgressMeter
 
 include("./domain/grid.jl")
 include("./domain/barrier.jl")
@@ -30,12 +32,8 @@ include("./magflux/solovev.jl")
 include("./physics/formulas.jl")
 include("./physics/timestep.jl")
 
+# end
 
-# have placeholder test_simulation for now
-function test_simulation()
-
-    return true
-end
 
 
 end

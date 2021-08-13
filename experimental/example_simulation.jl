@@ -129,10 +129,10 @@ function example_geometry_setup(path::String, Nx, Ny)
     dp_priv = abs(ForwardDiff.derivative(u -> psi(1,u), -(0.561 + 0.05))) * dr
 
     # create Grid
-    deltas = Float64[dp_in, 0.5*(dp_out + dp_priv), 2*dr]
+    deltas = Float64[dp_in, 0.5*(dp_out + dp_priv), dr]
     barrs = [inner_flux, outer_flux, target]
     grd = Grid(Nx, Ny, 1) do
-        inside(x,y) = check_if_inside(x, y, 5*deltas, barrs)
+        inside(x,y) = check_if_inside(x, y, 10*deltas, barrs)
         r0 = Float64[0.5, -1]
         r1 = Float64[1.5, 1]
         inside, r0, r1
@@ -156,9 +156,9 @@ function example_geometry_setup(path::String, Nx, Ny)
     h1 = ones(grd.Nk)
     h2 = ones(grd.Nk)
     h3 = ones(grd.Nk)
-    h1[pen[:,1] .!= 1.0] .= 0.0
-    h2[pen[:,2] .!= 1.0] .= 0.0
-    h3[pen[:,3] .!= 1.0] .= 0.0
+    h1[pen[:,1] .!= 0.0] .= 0.0
+    h2[pen[:,2] .!= 0.0] .= 0.0
+    h3[pen[:,3] .!= 0.0] .= 0.0
     H1 = sparse(Diagonal(h1))
     H2 = sparse(Diagonal(h2))
     H3 = sparse(Diagonal(h3))
@@ -175,7 +175,7 @@ function example_geometry_setup(path::String, Nx, Ny)
     lcfs_avg = flux_surface_average(psi, 0.0, 150, Float64[1, 0], 4, 4, stencil2d(4, 4), grd)
 
     # trace field-line images
-    img = fieldline_images(bx, by, bz, 0.01, grd)
+    # img = fieldline_images(bx, by, bz, 0.01, grd)
 
     fid = h5open(path, "w")
     save_grid(fid, grd, "Grid")
@@ -189,7 +189,7 @@ function example_geometry_setup(path::String, Nx, Ny)
     save_ghost_conditions(fid, GC_u, "GC_u")
     fid["trgt_sgn"] = trgt_sgn[:]
     save_sparse_matrix(fid, lcfs_avg, "lcfs_avg")
-    fid["FL_img"] = img[:,:]
+    # fid["FL_img"] = img[:,:]
     close(fid)
 end
 
@@ -243,7 +243,7 @@ function example_physics_setup(R0, n0, T0, B0, init_path, geo_path)
     Pi_yy = Dyy * Pi
     phi_b = bval_phi(w[:,2], Te, lcfs_avg, H1, H2, H3)
     phi = solve_vorticity_eqn(phi_b, w[:,2], n, lnn_x, lnn_y, Pi_xx, Pi_yy, ad, Dx, Dy, Dxx, Dyy, GC_dchlt)
-    return phi_b
+    return phi, grd
     fid = h5open(init_path, "w")
     fid["lnn"] = lnn[:,:]
     fid["lnTe"] = lnTe[:,:]
