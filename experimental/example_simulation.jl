@@ -103,7 +103,7 @@ function example_geometry_setup(path::String, Nx, Ny)
 
     # define barriers for flux surfaces
     inner_flux = Barrier() do
-        func(x,y) = (y > -0.561) ? psi(x,y) : Inf
+        func(x,y) = (y > -0.561) ? psi(x,y) : abs(psi(x,y))
         rmap(x,y) = trace_reflection(x, y, psi, psi_in, 0.001)
         func, psi_in, rmap, 1
     end
@@ -129,9 +129,9 @@ function example_geometry_setup(path::String, Nx, Ny)
     dp_priv = abs(ForwardDiff.derivative(u -> psi(1,u), -(0.561 + 0.05))) * dr
 
     # create Grid
-    deltas = Float64[dp_in, 0.5*(dp_out + dp_priv), dr]
+    deltas = Float64[dp_in, 0.5*(dp_out + dp_priv), 2*dr]
     barrs = [inner_flux, outer_flux, target]
-    grd = Grid(Nx, Ny, 1; Nbuffer=0) do
+    grd = Grid(Nx, Ny, 1) do
         inside(x,y) = check_if_inside(x, y, 5*deltas, barrs)
         r0 = Float64[0.5, -1]
         r1 = Float64[1.5, 1]
@@ -153,7 +153,9 @@ function example_geometry_setup(path::String, Nx, Ny)
     K2 = 100 * (I - K1)
 
     # H1, H2, and H3 are for defining boundary values.
-    h1 = h2 = h3 = ones(grd.Nk)
+    h1 = ones(grd.Nk)
+    h2 = ones(grd.Nk)
+    h3 = ones(grd.Nk)
     h1[pen[:,1] .!= 1.0] .= 0.0
     h2[pen[:,2] .!= 1.0] .= 0.0
     h3[pen[:,3] .!= 1.0] .= 0.0
@@ -162,8 +164,8 @@ function example_geometry_setup(path::String, Nx, Ny)
     H3 = sparse(Diagonal(h3))
 
     # compute ghost-conditions
-    GC_dchlt = GhostConditions(barrs, grd)
-    GC_nmann = swap_sign(GC_dchlt, 1, 2, 3)
+    GC_nmann = GhostConditions(barrs, grd) #XXX this is backwards now I think.
+    GC_dchlt = swap_sign(GC_nmann, 1, 2, 3)
     GC_u = swap_sign(GC_nmann, 3)
 
     # define vector for function that is +1 on left plate and -1 on right plate
@@ -241,7 +243,7 @@ function example_physics_setup(R0, n0, T0, B0, init_path, geo_path)
     Pi_yy = Dyy * Pi
     phi_b = bval_phi(w[:,2], Te, lcfs_avg, H1, H2, H3)
     phi = solve_vorticity_eqn(phi_b, w[:,2], n, lnn_x, lnn_y, Pi_xx, Pi_yy, ad, Dx, Dy, Dxx, Dyy, GC_dchlt)
-
+    return phi_b
     fid = h5open(init_path, "w")
     fid["lnn"] = lnn[:,:]
     fid["lnTe"] = lnTe[:,:]
