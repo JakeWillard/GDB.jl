@@ -1,25 +1,26 @@
 
 
 
-function jacobi_preconditioned_gmres(A::SparseMatrixCSC, x0::Vector{Float64}, b::Vector{Float64}, Nz, pchunks; Na=100, Ns=10, m=20, err_thresh=1e-8)
+function jacobi_preconditioned_gmres(A::SparseMatrixCSC, x0::Vector{Float64}, b::Vector{Float64}, Nz, pchunks; w=2/3, Na=100, Ns=10, m=20, err_thresh=1e-8)
 
     Nk = div(length(x0), Nz)
 
-    J = JacobiSmoother(A::SparseMatrixCSC, b::Vector{Float64}, w::Float64, pchunks, Nk, Nz, Na)
+    J = JacobiSmoother(A, b::Vector{Float64}, w, pchunks, Nk, Nz, Na)
     x = x0[:]
-    for _=1:Ns
+    x[:] = J*x
+    for t=1:Ns
         x[:] = J * x
     end
 
     err = norm(A*x - b)
     if err > err_thresh
-        zslices = collect(Iterations.partition(1:Nk*Nz, Nz))
+        zslices = collect(Iterators.partition(1:Nk*Nz, Nz))
         c = pmap(zslices) do inds
             Aloc = A[inds, inds]
             bloc = b[inds]
-            gmres_solve(Aloc, x[inds], bloc, m; err_thresh=err_thres)
+            gmres_solve(Aloc, x[inds], bloc, m; err_thresh=err_thresh)
         end
-        return vcat(c)
+        return vcat(c...)
     else
         return x
     end

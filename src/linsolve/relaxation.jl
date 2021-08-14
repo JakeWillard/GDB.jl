@@ -15,13 +15,14 @@ function JacobiSmoother(A::SparseMatrixCSC, b::Vector{Float64}, w::Float64, pchu
     C = I - D*A
     f = D * b
 
-    pslices = collect(Interators.partition(1:Nk, pchunks))
-    slices = UnitRange[]
+    pslices = collect(Iterators.partition(1:Nk, pchunks))
+    # pslices = UnitRange{Int64}[g[1]:g[end] for g in pgroups]
+    slices = UnitRange{Int64}[]
     for z=1:Nz
-        slices = [slices; pslices .+ (z-1)*Nk]
+        slices = [slices; [s .+ (z-1)*Nk for s in pslices]]
     end
 
-    return JacobiSmoother(C, f, Na, slices)
+    return JacobiSmoother(C, f, Na, pslices)
 end
 
 
@@ -32,11 +33,11 @@ function Base.:*(J::JacobiSmoother, v::Vector{Float64})
         C_loc = J.C[inds, :]
         f_loc = J.f[inds]
 
-        for _=1:J.asynch_steps
+        for t=1:J.asynch_steps
             x[inds] = C_loc * x + f_loc
         end
         x[inds]
     end
 
-    return vcat(out)
+    return vcat(out...)
 end

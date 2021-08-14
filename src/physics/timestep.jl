@@ -18,12 +18,12 @@ function bval_phi(phi, Te, lcfs_avg, H1, H2, H3)
 end
 
 
-function solve_pde(A, b, xb, gc::GhostConditions)
+function solve_pde(A, x0, b, xb, gc::GhostConditions)
 
     An, B = require_boundary_conditions(A, gc)
     bn = gc.Proj*b - B*xb
-    x = An \ bn
-
+    x = jacobi_preconditioned_gmres(An, gc.Proj*x0, bn, 1, length(x0))
+    # x = An \ bn
     return gc.Mirror*transpose(gc.Proj)*x + (I - gc.Mirror)*xb
 end
 
@@ -31,23 +31,23 @@ end
 function solve_diffusion(x, xb, k, Dxx, Dyy, gc::GhostConditions)
 
     M = I - k*(Dxx + Dyy)
-    return solve_pde(M, x, xb, gc)
+    return solve_pde(M, x, x, xb, gc)
 end
 
 
-function solve_vorticity_eqn(phi_b, w, n, lnn_x, lnn_y, Pi_xx, Pi_yy, ad, Dx, Dy, Dxx, Dyy, gc::GhostConditions)
+function solve_vorticity_eqn(phi, phi_b, w, n, lnn_x, lnn_y, Pi_xx, Pi_yy, ad, Dx, Dy, Dxx, Dyy, gc::GhostConditions)
 
     M = Dxx + Dyy + Diagonal(lnn_x) * Dx + Diagonal(lnn_y) * Dy
     b = (w - ad*(Pi_xx + Pi_yy)) ./ n
 
-    return solve_pde(M, b, phi_b, gc)
+    return solve_pde(M, phi, b, phi_b, gc)
 end
 
 
-function solve_helmholtz_eqn(A, de2, Dxx, Dyy, gc::GhostConditions)
+function solve_helmholtz_eqn(psi, A, de2, Dxx, Dyy, gc::GhostConditions)
 
     M = I - de2*(Dxx + Dyy)
-    return solve_pde(M, A, zeros(length(A)), gc)
+    return solve_pde(M, psi, A, zeros(length(A)), gc)
 end
 
 
@@ -252,8 +252,8 @@ function leapfrog!(lnn, lnTe, lnTi, u, w, A, phi, psi, n, Te, Ti, Pe, Pi, j, jn,
     lnn_y = Dy * lnn[:,3]
     Pi_xx = Dxx * Pi
     Pi_yy = Dyy * Pi
-    phi = solve_vorticity_eqn(phi_b, w[:,3], n, lnn_x, lnn_y, Pi_xx, Pi_yy, ad, Dx, Dy, Dxx, Dyy, GC_dchlt)
-    psi = solve_helmholtz_eqn(A[:,3], de2, Dxx, Dyy, GC_dchlt)
+    phi = solve_vorticity_eqn(phi, phi_b, w[:,3], n, lnn_x, lnn_y, Pi_xx, Pi_yy, ad, Dx, Dy, Dxx, Dyy, GC_dchlt)
+    psi = solve_helmholtz_eqn(psi, A[:,3], de2, Dxx, Dyy, GC_dchlt)
 
     # compute current
     j[:] = (Dxx + Dyy) * psi
@@ -380,8 +380,8 @@ function leapfrog!(lnn, lnTe, lnTi, u, w, A, phi, psi, n, Te, Ti, Pe, Pi, j, jn,
     lnn_y = Dy * lnn[:,3]
     Pi_xx = Dxx * Pi
     Pi_yy = Dyy * Pi
-    phi = solve_vorticity_eqn(phi_b, w[:,3], n, lnn_x, lnn_y, Pi_xx, Pi_yy, ad, Dx, Dy, Dxx, Dyy, GC_dchlt)
-    psi = solve_helmholtz_eqn(A[:,3], de2, Dxx, Dyy, GC_dchlt)
+    phi = solve_vorticity_eqn(phi, phi_b, w[:,3], n, lnn_x, lnn_y, Pi_xx, Pi_yy, ad, Dx, Dy, Dxx, Dyy, GC_dchlt)
+    psi = solve_helmholtz_eqn(psi, A[:,3], de2, Dxx, Dyy, GC_dchlt)
 
     # compute current
     j[:] = (Dxx + Dyy) * psi
