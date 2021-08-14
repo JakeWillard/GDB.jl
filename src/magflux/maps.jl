@@ -68,18 +68,18 @@ function fieldline_derivatives(img::Matrix{Float64}, mx::Int64, my::Int64, MinvT
 
     is = vcat([k*ones(mx*my) for k=1:grd.Nk]...)
     c = pmap(1:grd.Nk) do k
-        chunk = zeros(mx*my, 4)
-        try
-            fwd_row_dat, fwd_row_j = interpolation_row(fwd_pts[:,k]..., mx, my, MinvT, grd)
-            bck_row_dat, bck_row_j = interpolation_row(bck_pts[:,k]..., mx, my, MinvT, grd)
-            chunk[:,:] = hcat(fwd_row_dat, fwd_row_j, bck_row_dat, bck_row_j)
-        catch
+
+        fwd_row_dat, fwd_row_j = interpolation_row(fwd_pts[:,k]..., mx, my, MinvT, grd)
+        bck_row_dat, bck_row_j = interpolation_row(bck_pts[:,k]..., mx, my, MinvT, grd)
+        if any(x -> !(0 < x < grd._Nx*grd._Ny), fwd_row_j)
             fwd_row_dat, fwd_row_j = interpolation_row(grd.points[:,k]..., mx, my, MinvT, grd)
-            bck_row_dat, bck_row_j = interpolation_row(grd.points[:,k]..., mx, my, MinvT, grd)
-            chunk[:,:] = hcat(fwd_row_dat, fwd_row_j, bck_row_dat, bck_row_j)
         end
+        if any(x -> !(0 < x < grd._Nx*grd._Ny), bck_row_j)
+            bck_row_dat, bck_row_j = interpolation_row(grd.points[:,k]..., mx, my, MinvT, grd)
+        end
+
         put!(chnl, true)
-        chunk
+        hcat(fwd_row_dat, fwd_row_j, bck_row_dat, bck_row_j)
     end
 
     M = vcat(c...)
