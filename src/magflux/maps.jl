@@ -59,21 +59,41 @@ function fieldline_derivatives(img::Matrix{Float64}, mx::Int64, my::Int64, MinvT
     Ic[end,1] = 1
 
     # make fieldline map matrices
+
+    chnl = RemoteChannel(()->Channel{Bool}(), 1)
+    p = Progress(grd.Nk, desc="Generating fieldline derivatives... ")
+    @async while take!(chnl)
+        next!(p)
+    end
+
     is = vcat([k*ones(mx*my) for k=1:grd.Nk]...)
-    fwd_j = Int64[]
-    fwd_dat = Float64[]
-    bck_j = Int64[]
-    bck_dat = Float64[]
-    for k=1:grd.Nk
+    c = pmap(1:grd.Nk) do k
         fwd_row_dat, fwd_row_j = interpolation_row(fwd_pts[:,k]..., mx, my, MinvT, grd)
         bck_row_dat, bck_row_j = interpolation_row(bck_pts[:,k]..., mx, my, MinvT, grd)
-        fwd_j = [fwd_j; fwd_row_j]
-        fwd_dat = [fwd_dat; fwd_row_dat]
-        bck_j = [bck_j; bck_row_j]
-        bck_dat = [bck_dat; bck_row_dat]
-
-        @info "$k/$(grd.Nk)"
+        put!(chnl, true)
+        hcat(fwd_row_dat, fwd_row_j, bck_row_dat, bck_row_j)
     end
+
+    M = vcat(c...)
+    fwd_dat = M[:,1]
+    fwd_j = Int64[M[:,2]...]
+    bck_dat = M[:,3]
+    bck_j = Int64[M[:,4]...]
+
+    # fwd_j = Int64[]
+    # fwd_dat = Float64[]
+    # bck_j = Int64[]
+    # bck_dat = Float64[]
+    # for k=1:grd.Nk
+    #     fwd_row_dat, fwd_row_j = interpolation_row(fwd_pts[:,k]..., mx, my, MinvT, grd)
+    #     bck_row_dat, bck_row_j = interpolation_row(bck_pts[:,k]..., mx, my, MinvT, grd)
+    #     fwd_j = [fwd_j; fwd_row_j]
+    #     fwd_dat = [fwd_dat; fwd_row_dat]
+    #     bck_j = [bck_j; bck_row_j]
+    #     bck_dat = [bck_dat; bck_row_dat]
+    #
+    #     @info "$k/$(grd.Nk)"
+    # end
 
     FWD = sparse(is, fwd_j, fwd_dat, grd.Nk, grd._Nx*grd._Ny) * transpose(grd.Proj)
     BCK = sparse(is, bck_j, bck_dat, grd.Nk, grd._Nx*grd._Ny) * transpose(grd.Proj)
@@ -82,6 +102,7 @@ function fieldline_derivatives(img::Matrix{Float64}, mx::Int64, my::Int64, MinvT
     Ds = kron(Ia, _A*BCK) + kron(Ib, _B) + kron(Ic, _C*FWD)
     Dss = kron(Ia, _D*BCK) + kron(Ib, _E) + kron(Ic, _F*FWD)
 
+    put!(chnl, false)
     return Ds, Dss
 end
 

@@ -206,13 +206,21 @@ function example_physics_setup(R0, n0, T0, B0, init_path, geo_path)
     H1 = load_sparse_matrix(geofid, "H1")
     H2 = load_sparse_matrix(geofid, "H2")
     H3 = load_sparse_matrix(geofid, "H3")
+    FL_img = geofid["FL_img"][:,:]
     close(geofid)
 
     Minv = stencil1d(5)
+    MinvT = stencil2d(4, 4)
     Dx = derivative_matrix(1, 0, Minv, Minv, grd) * 0.3
     Dy = derivative_matrix(0, 1, Minv, Minv, grd) * 0.3
+    Dxy = derivative_matrix(1, 1, Minv, Minv, grd) * (0.3)^2
     Dxx = derivative_matrix(2, 0, Minv, Minv, grd) * (0.3)^2
     Dyy = derivative_matrix(0, 2, Minv, Minv, grd) * (0.3)^2
+    Dxxx = derivative_matrix(3, 0, Minv, Minv, grd) * (0.3)^3
+    Dyyy = derivative_matrix(0, 3, Minv, Minv, grd) * (0.3)^3
+    Dxxy = derivative_matrix(2, 1, Minv, Minv, grd) * (0.3)^3
+    Dxyy = derivative_matrix(1, 2, Minv, Minv, grd) * (0.3)^3
+    Ds, Dss = fieldline_derivatives(FL_img, 4, 4, MinvT, grd)
 
     psi_in = psi(1 - 0.28, 0)
     dp = abs(psi_in)
@@ -245,6 +253,17 @@ function example_physics_setup(R0, n0, T0, B0, init_path, geo_path)
     phi = solve_vorticity_eqn(phi_b, w[:,2], n, lnn_x, lnn_y, Pi_xx, Pi_yy, ad, Dx, Dy, Dxx, Dyy, GC_dchlt)
 
     fid = h5open(init_path, "w")
+    save_sparse_matrix(fid, Dx, "Dx")
+    save_sparse_matrix(fid, Dy, "Dy")
+    save_sparse_matrix(fid, Dxy, "Dxy")
+    save_sparse_matrix(fid, Dxx, "Dxx")
+    save_sparse_matrix(fid, Dyy, "Dyy")
+    save_sparse_matrix(fid, Dxxx, "Dxxx")
+    save_sparse_matrix(fid, Dyyy, "Dyyy")
+    save_sparse_matrix(fid, Dxxy, "Dxxy")
+    save_sparse_matrix(fid, Dxyy, "Dxyy")
+    save_sparse_matrix(fid, Ds, "Ds")
+    save_sparse_matrix(fid, Dss, "Dss")
     fid["lnn"] = lnn[:,:]
     fid["lnTe"] = lnTe[:,:]
     fid["lnTi"] = lnTi[:,:]
@@ -284,6 +303,17 @@ function test_simulate(Nt, sn, ste, sti, kdiff, dt, output_path, init_path, geo_
     close(geofid)
 
     fid = h5open(init_path, "r")
+    Dx = load_sparse_matrix(fid, "Dx")
+    Dy = load_sparse_matrix(fid, "Dy")
+    Dxy = load_sparse_matrix(fid, "Dxy")
+    Dxx = load_sparse_matrix(fid, "Dxx")
+    Dyy = load_sparse_matrix(fid, "Dyy")
+    Dxxx = load_sparse_matrix(fid, "Dxxx")
+    Dyyy = load_sparse_matrix(fid, "Dyyy")
+    Dxxy = load_sparse_matrix(fid, "Dxxy")
+    Dxyy = load_sparse_matrix(fid, "Dxyy")
+    Ds = load_sparse_matrix(fid, "Ds")
+    Dss = load_sparse_matrix(fid, "Dss")
     lnn = fid["lnn"][:,:]
     lnTe = fid["lnTe"][:,:]
     lnTi = fid["lnTi"][:,:]
@@ -302,19 +332,6 @@ function test_simulate(Nt, sn, ste, sti, kdiff, dt, output_path, init_path, geo_
     Sp = fid["Sp"][:]
     am, ad, ki, ke, er, eg, ev, de2, eta = fid["params"][:]
     close(fid)
-
-    Minv = stencil1d(5)
-    MinvT = stencil2d(4, 4)
-    Dx = derivative_matrix(1, 0, Minv, Minv, grd) * 0.3
-    Dy = derivative_matrix(0, 1, Minv, Minv, grd) * 0.3
-    Dxy = derivative_matrix(1, 1, Minv, Minv, grd) * (0.3)^2
-    Dxx = derivative_matrix(2, 0, Minv, Minv, grd) * (0.3)^2
-    Dyy = derivative_matrix(0, 2, Minv, Minv, grd) * (0.3)^2
-    Dxxx = derivative_matrix(3, 0, Minv, Minv, grd) * (0.3)^3
-    Dyyy = derivative_matrix(0, 3, Minv, Minv, grd) * (0.3)^3
-    Dxxy = derivative_matrix(2, 1, Minv, Minv, grd) * (0.3)^3
-    Dxyy = derivative_matrix(1, 2, Minv, Minv, grd) * (0.3)^3
-    Ds, Dss = fieldline_derivatives(FL_img, 4, 4, MinvT, grd)
 
     Sn = sn * Sp
     STe = ste * Sp
