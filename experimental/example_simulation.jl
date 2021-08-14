@@ -250,6 +250,7 @@ function example_physics_setup(R0, n0, T0, B0, init_path, geo_path)
     Pi_xx = Dxx * Pi
     Pi_yy = Dyy * Pi
     phi_b = bval_phi(w[:,2], Te, lcfs_avg, H1, H2, H3)
+    ad = 1.0 # XXX
     phi = solve_vorticity_eqn(phi_b, w[:,2], n, lnn_x, lnn_y, Pi_xx, Pi_yy, ad, Dx, Dy, Dxx, Dyy, GC_dchlt)
 
     fid = h5open(init_path, "w")
@@ -280,7 +281,8 @@ function example_physics_setup(R0, n0, T0, B0, init_path, geo_path)
     fid["j"] = j[:]
     fid["jn"] = jn[:]
     fid["Sp"] = Sp[:]
-    fid["params"] = Float64[am, ad, ki, ke, er, eg, ev, de2, eta]
+    fid["params"] = ones(Float64, 9)
+    # fid["params"] = Float64[am, ad, ki, ke, er, eg, ev, de2, eta]
     close(fid)
 end
 
@@ -332,19 +334,41 @@ function test_simulate(Nt, sn, ste, sti, kdiff, dt, output_path, init_path, geo_
     Sp = fid["Sp"][:]
     am, ad, ki, ke, er, eg, ev, de2, eta = fid["params"][:]
     close(fid)
+    am, ad, ki, ke, er, eg, ev, de2, eta = ones(Float64, 9)
+
+    fid = h5open(output_path, "w")
+    create_dataset(fid, "n", datatype(Float64), dataspace(grd.Nk*grd.Nz,Nt), chunk=(grd.Nk*grd.Nz,1))
+    create_dataset(fid, "Te", datatype(Float64), dataspace(grd.Nk*grd.Nz,Nt), chunk=(grd.Nk*grd.Nz,1))
+    create_dataset(fid, "Ti", datatype(Float64), dataspace(grd.Nk*grd.Nz,Nt), chunk=(grd.Nk*grd.Nz,1))
+    create_dataset(fid, "u", datatype(Float64), dataspace(grd.Nk*grd.Nz,Nt), chunk=(grd.Nk*grd.Nz,1))
+    create_dataset(fid, "phi", datatype(Float64), dataspace(grd.Nk*grd.Nz,Nt), chunk=(grd.Nk*grd.Nz,1))
+    create_dataset(fid, "psi", datatype(Float64), dataspace(grd.Nk*grd.Nz,Nt), chunk=(grd.Nk*grd.Nz,1))
+    fid["n"][:,1] = n[:]
+    fid["Te"][:,1] = Te[:]
+    fid["Ti"][:,1] = Ti[:]
+    fid["u"][:,1] = u[:,2]
+    fid["phi"][:,1] = phi[:]
+    fid["psi"][:,1] = psi[:]
+    close(fid)
 
     Sn = sn * Sp
     STe = ste * Sp
     STi = sti * Sp
     kdiff_lnn, kdiff_lnTe, kdiff_lnTi, kdiff_u, kdiff_w, kdiff_A = kdiff[:]
-    return phi, grd
-    for t=1:Nt
+    @showprogress "Running GDB... " for t=2:Nt
         leapfrog!(1, lnn, lnTe, lnTi, u, w, A, phi, psi, n, Te, Ti, Pe, Pi, j, jn, Sn, STe, STi, Dx, Dy, Dxy, Dxx, Dyy, Dxxx, Dyyy,
                   Dxxy, Dxyy, Ds, Dss, dt, 10, K1, K2, H1, H2, H3, trgt_sgn, lcfs_avg, GC_nmann, GC_dchlt, GC_u, kdiff_lnn,
                   kdiff_lnTe, kdiff_lnTi, kdiff_u, kdiff_w, kdiff_A, am, ad, ki, ke, er, eg, ev, de2, eta)
-        # write to output
-        # ;alksdjfl;kasjfl;sk
+
+        fid = h5open(output_path, "r+")
+        fid["n"][:,t] = n[:]
+        fid["Te"][:,t] = Te[:]
+        fid["Ti"][:,t] = Ti[:]
+        fid["u"][:,t] = u[:,2]
+        fid["phi"][:,t] = phi[:]
+        fid["psi"][:,t] = psi[:]
+        close(fid)
+
     end
 
-    return n, grd
 end

@@ -72,70 +72,70 @@ function leapfrog!(lnn, lnTe, lnTi, u, w, A, phi, psi, n, Te, Ti, Pe, Pi, j, jn,
     psi_yy = Dyy*psi
 
     # subcycle electron thermal conduction terms
-    lnTe0 = lnTe[:,2]
-    for _=1:N_subcycle
-
-        # derivatives
-        lnTe_x = Dx*lnTe[:,2]
-        lnTe_y = Dy*lnTe[:,2]
-        lnTe_xy = Dxy*lnTe[:,2]
-        lnTe_xx = Dxx*lnTe[:,2]
-        lnTe_yy = Dyy*lnTe[:,2]
-        lnTe_s = partial_s(lnTe[:,2], lnTe_x, lnTe_y, psi_x, psi_y, Ds, am)
-        lnTe_ss = partial_ss(lnTe[:,2], lnTe_s, lnTe_x, lnTe_y, lnTe_xy, lnTe_xx, lnTe_yy, psi_x, psi_y, psi_xy, psi_xx, psi_yy, Dss, Ds, Dx, Dy, am)
-
-        lnTe_t = lnT_partial_thermal(lnTe_s, lnTe_ss, Te, n, ke) + STe
-        lnTe[:,3] = forward_euler(0.5*(lnTe[:,1] + lnTe[:,2]), lnTe_t, bval_hom, K1, K2, dt/N_subcycle, GC_nmann)
-
-        # derivatives again
-        lnTe_x = Dx*lnTe[:,2]
-        lnTe_y = Dy*lnTe[:,2]
-        lnTe_xy = Dxy*lnTe[:,2]
-        lnTe_xx = Dxx*lnTe[:,2]
-        lnTe_yy = Dyy*lnTe[:,2]
-        lnTe_s = partial_s(lnTe[:,2], lnTe_x, lnTe_y, psi_x, psi_y, Ds, am)
-        lnTe_ss = partial_ss(lnTe[:,2], lnTe_s, lnTe_x, lnTe_y, lnTe_xy, lnTe_xx, lnTe_yy, psi_x, psi_y, psi_xy, psi_xx, psi_yy, Dss, Ds, Dx, Dy, am)
-
-        lnTe_t = lnT_partial_thermal(lnTe_s, lnTe_ss, Te, n, ke) + STe
-        lnTe[:,3] = forward_euler(lnTe[:,2], lnTe_t, bval_hom, K1, K2, dt/N_subcycle, GC_nmann)
-
-        # shift indices
-        lnTe[:,1:2] = lnTe[:,2:3]
-    end
-    lnTe[:,2] = 0.5*(lnTe0 + lnTe[:,2])
-
-    # subcycle ion thermal conduction terms
-    lnTi0 = lnTi[:,2]
-    for _=1:N_subcycle
-
-        # derivatives
-        lnTi_x = Dx*lnTi[:,2]
-        lnTi_y = Dy*lnTi[:,2]
-        lnTi_xy = Dxy*lnTi[:,2]
-        lnTi_xx = Dxx*lnTi[:,2]
-        lnTi_yy = Dyy*lnTi[:,2]
-        lnTi_s = partial_s(lnTi[:,2], lnTi_x, lnTi_y, psi_x, psi_y, Ds, am)
-        lnTi_ss = partial_ss(lnTi[:,2], lnTi_s, lnTi_x, lnTi_y, lnTi_xy, lnTi_xx, lnTi_yy, psi_x, psi_y, psi_xy, psi_xx, psi_yy, Dss, Ds, Dx, Dy, am)
-
-        lnTi_t = lnT_partial_thermal(lnTi_s, lnTi_ss, Te, n, ke) + STi
-        lnTi[:,3] = forward_euler(0.5*(lnTi[:,1] + lnTi[:,2]), lnTi_t, bval_hom, K1, K2, dt/N_subcycle, GC_nmann)
-
-        # derivatives again
-        lnTi_x = Dx*lnTi[:,2]
-        lnTi_y = Dy*lnTi[:,2]
-        lnTi_xy = Dxy*lnTi[:,2]
-        lnTi_xx = Dxx*lnTi[:,2]
-        lnTi_yy = Dyy*lnTi[:,2]
-        lnTi_s = partial_s(lnTi[:,2], lnTi_x, lnTi_y, psi_x, psi_y, Ds, am)
-        lnTi_ss = partial_ss(lnTi[:,2], lnTi_s, lnTi_x, lnTi_y, lnTi_xy, lnTi_xx, lnTi_yy, psi_x, psi_y, psi_xy, psi_xx, psi_yy, Dss, Ds, Dx, Dy, am)
-
-        lnTi_t = lnT_partial_thermal(lnTi_s, lnTi_ss, Te, n, ke) + STi
-        lnTi[:,3] = forward_euler(lnTi[:,2], lnTi_t, bval_hom, K1, K2, dt/N_subcycle, GC_nmann)
-
-        # shift indices
-        lnTi[:,1:2] = lnTi[:,2:3]
-    end
-    lnTi[:,2] = 0.5*(lnTi0 + lnTi[:,2])
+    # lnTe0 = lnTe[:,2]
+    # for _=1:N_subcycle
+    #
+    #     # derivatives
+    #     lnTe_x = Dx*lnTe[:,2]
+    #     lnTe_y = Dy*lnTe[:,2]
+    #     lnTe_xy = Dxy*lnTe[:,2]
+    #     lnTe_xx = Dxx*lnTe[:,2]
+    #     lnTe_yy = Dyy*lnTe[:,2]
+    #     lnTe_s = partial_s(lnTe[:,2], lnTe_x, lnTe_y, psi_x, psi_y, Ds, am)
+    #     lnTe_ss = partial_ss(lnTe[:,2], lnTe_s, lnTe_x, lnTe_y, lnTe_xy, lnTe_xx, lnTe_yy, psi_x, psi_y, psi_xy, psi_xx, psi_yy, Dss, Ds, Dx, Dy, am)
+    #
+    #     lnTe_t = lnT_partial_thermal(lnTe_s, lnTe_ss, Te, n, ke) + STe
+    #     lnTe[:,3] = forward_euler(0.5*(lnTe[:,1] + lnTe[:,2]), lnTe_t, bval_hom, K1, K2, dt/N_subcycle, GC_nmann)
+    #
+    #     # derivatives again
+    #     lnTe_x = Dx*lnTe[:,2]
+    #     lnTe_y = Dy*lnTe[:,2]
+    #     lnTe_xy = Dxy*lnTe[:,2]
+    #     lnTe_xx = Dxx*lnTe[:,2]
+    #     lnTe_yy = Dyy*lnTe[:,2]
+    #     lnTe_s = partial_s(lnTe[:,2], lnTe_x, lnTe_y, psi_x, psi_y, Ds, am)
+    #     lnTe_ss = partial_ss(lnTe[:,2], lnTe_s, lnTe_x, lnTe_y, lnTe_xy, lnTe_xx, lnTe_yy, psi_x, psi_y, psi_xy, psi_xx, psi_yy, Dss, Ds, Dx, Dy, am)
+    #
+    #     lnTe_t = lnT_partial_thermal(lnTe_s, lnTe_ss, Te, n, ke) + STe
+    #     lnTe[:,3] = forward_euler(lnTe[:,2], lnTe_t, bval_hom, K1, K2, dt/N_subcycle, GC_nmann)
+    #
+    #     # shift indices
+    #     lnTe[:,1:2] = lnTe[:,2:3]
+    # end
+    # lnTe[:,2] = 0.5*(lnTe0 + lnTe[:,2])
+    #
+    # # subcycle ion thermal conduction terms
+    # lnTi0 = lnTi[:,2]
+    # for _=1:N_subcycle
+    #
+    #     # derivatives
+    #     lnTi_x = Dx*lnTi[:,2]
+    #     lnTi_y = Dy*lnTi[:,2]
+    #     lnTi_xy = Dxy*lnTi[:,2]
+    #     lnTi_xx = Dxx*lnTi[:,2]
+    #     lnTi_yy = Dyy*lnTi[:,2]
+    #     lnTi_s = partial_s(lnTi[:,2], lnTi_x, lnTi_y, psi_x, psi_y, Ds, am)
+    #     lnTi_ss = partial_ss(lnTi[:,2], lnTi_s, lnTi_x, lnTi_y, lnTi_xy, lnTi_xx, lnTi_yy, psi_x, psi_y, psi_xy, psi_xx, psi_yy, Dss, Ds, Dx, Dy, am)
+    #
+    #     lnTi_t = lnT_partial_thermal(lnTi_s, lnTi_ss, Te, n, ke) + STi
+    #     lnTi[:,3] = forward_euler(0.5*(lnTi[:,1] + lnTi[:,2]), lnTi_t, bval_hom, K1, K2, dt/N_subcycle, GC_nmann)
+    #
+    #     # derivatives again
+    #     lnTi_x = Dx*lnTi[:,2]
+    #     lnTi_y = Dy*lnTi[:,2]
+    #     lnTi_xy = Dxy*lnTi[:,2]
+    #     lnTi_xx = Dxx*lnTi[:,2]
+    #     lnTi_yy = Dyy*lnTi[:,2]
+    #     lnTi_s = partial_s(lnTi[:,2], lnTi_x, lnTi_y, psi_x, psi_y, Ds, am)
+    #     lnTi_ss = partial_ss(lnTi[:,2], lnTi_s, lnTi_x, lnTi_y, lnTi_xy, lnTi_xx, lnTi_yy, psi_x, psi_y, psi_xy, psi_xx, psi_yy, Dss, Ds, Dx, Dy, am)
+    #
+    #     lnTi_t = lnT_partial_thermal(lnTi_s, lnTi_ss, Te, n, ke) + STi
+    #     lnTi[:,3] = forward_euler(lnTi[:,2], lnTi_t, bval_hom, K1, K2, dt/N_subcycle, GC_nmann)
+    #
+    #     # shift indices
+    #     lnTi[:,1:2] = lnTi[:,2:3]
+    # end
+    # lnTi[:,2] = 0.5*(lnTi0 + lnTi[:,2])
 
     # take other derivatives
     phi_x = Dx*phi
@@ -402,6 +402,5 @@ function leapfrog!(N, args...)
 
     for t=1:N
         leapfrog!(args...)
-        @info "$t"
     end
 end
