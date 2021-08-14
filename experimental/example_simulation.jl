@@ -175,7 +175,7 @@ function example_geometry_setup(path::String, Nx, Ny)
     lcfs_avg = flux_surface_average(psi, 0.0, 150, Float64[1, 0], 4, 4, stencil2d(4, 4), grd)
 
     # trace field-line images
-    # img = fieldline_images(bx, by, bz, 0.01, grd)
+    img = fieldline_images(bx, by, bz, 0.01, grd)
 
     fid = h5open(path, "w")
     save_grid(fid, grd, "Grid")
@@ -189,7 +189,7 @@ function example_geometry_setup(path::String, Nx, Ny)
     save_ghost_conditions(fid, GC_u, "GC_u")
     fid["trgt_sgn"] = trgt_sgn[:]
     save_sparse_matrix(fid, lcfs_avg, "lcfs_avg")
-    # fid["FL_img"] = img[:,:]
+    fid["FL_img"] = img[:,:]
     close(fid)
 end
 
@@ -243,7 +243,7 @@ function example_physics_setup(R0, n0, T0, B0, init_path, geo_path)
     Pi_yy = Dyy * Pi
     phi_b = bval_phi(w[:,2], Te, lcfs_avg, H1, H2, H3)
     phi = solve_vorticity_eqn(phi_b, w[:,2], n, lnn_x, lnn_y, Pi_xx, Pi_yy, ad, Dx, Dy, Dxx, Dyy, GC_dchlt)
-    return phi, grd
+
     fid = h5open(init_path, "w")
     fid["lnn"] = lnn[:,:]
     fid["lnTe"] = lnTe[:,:]

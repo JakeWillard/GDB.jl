@@ -4,22 +4,34 @@ function fieldline_images(bx::Function, by::Function, bz::Function, ds::Float64,
 
     deltaPhi = 2*pi / grd.Nz
 
+    chnl = RemoteChannel(()->Channel{Bool}(), 1)
+    p = Progress(grd.Nk, desc="Mapping fieldlines... ")
+    @async while take!(chnl)
+        next!(p)
+    end
+
     img = DArray((6, grd.Nk), workers(), [1, length(workers())]) do inds
 
         Nk = length(inds[2])
         points0 = grd.points[:, inds[2]]
         imgpoints = zeros(6, Nk)
 
-        @showprogress for k=1:Nk
+        for k=1:Nk
 
-            imgpoints[1:3,k] = trace_fieldline(points0[:,k]..., bx, by, bz, ds, deltaPhi)
-            imgpoints[4:6,k] = trace_fieldline(points0[:,k]..., bx, by, bz, -ds, deltaPhi)
-            # @info "$k/$Nk"
+            try
+                imgpoints[1:3,k] = trace_fieldline(points0[:,k]..., bx, by, bz, ds, deltaPhi)
+                imgpoints[4:6,k] = trace_fieldline(points0[:,k]..., bx, by, bz, -ds, deltaPhi)
+            catch
+                imgpoints[1:3,k] = [points0[:,k]..., deltaPhi]
+                imgpoints[4:6,k] = [points0[:,k]..., deltaPhi]
+            end
+            put!(chnl, true)
 
         end
         imgpoints
     end
 
+    put!(chnl, false)
     return Matrix(img)
 end
 
@@ -59,6 +71,8 @@ function fieldline_derivatives(img::Matrix{Float64}, mx::Int64, my::Int64, MinvT
         fwd_dat = [fwd_dat; fwd_row_dat]
         bck_j = [bck_j; bck_row_j]
         bck_dat = [bck_dat; bck_row_dat]
+
+        @info "$k/$(grd.Nk)"
     end
 
     FWD = sparse(is, fwd_j, fwd_dat, grd.Nk, grd._Nx*grd._Ny) * transpose(grd.Proj)
