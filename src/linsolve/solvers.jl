@@ -12,7 +12,7 @@ function jacobi_preconditioned_gmres(A::SparseMatrixCSC, x0::Vector{Float64}, b:
         x[:] = J * x
     end
 
-    err = norm(A*x - b)
+    err = norm(A*x - b) / norm(b)
 
     @info err
     if err > err_thresh
