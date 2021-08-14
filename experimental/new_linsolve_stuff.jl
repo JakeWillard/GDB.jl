@@ -1,10 +1,46 @@
 
-"""
-changes:
-    - reflections should be calculated exclusively on ghost points.
-    - reflection_matrix() function should have input argument determining if we want
-      a reflection or anti-reflection operation, and also input for what to do on other points.
-"""
+
+struct JacobiSmoother
+
+    C :: SparseMatrixCSC
+    f :: Vector{Float64}
+    asynch_steps :: Int64
+    slices :: Vector{UnitRange}
+
+end
+
+
+function JacobiSmoother(A::SparseMatrixCSC, b::Vector{Float64}, w::Float64, pchunks, Na, grd::Grid)
+
+    D = w*Diagonal(1 ./ diag(A))
+    C = I - D*A
+    f = D * b
+
+    pslices = collect(Interators.partition(1:grd.Nk, pchunks))
+    slices = UnitRange[]
+    for z=1:grd.Nz
+        slices = [slices; pslices .+ (z-1)*grd.Nk]
+    end
+
+    return JacobiSmoother(C, f, Na, slices)
+end
+
+
+function Base.:*(J::JacobiSmoother, v::Vector{Float64})
+
+    out = pmap(J.slices) do inds
+        x = v[:]
+        C_loc = J.C[inds, :]
+        f_loc = J.f[inds]
+
+        for _=1:J.asynch_steps
+            x[inds] = C_loc * x + f_loc
+        end
+        x[inds]
+    end
+
+    return vcat(out)
+end
 
 
 struct LinearMap
