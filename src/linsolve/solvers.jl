@@ -1,7 +1,7 @@
 
 
 
-function jacobi_preconditioned_gmres(A::SparseMatrixCSC, x0::Vector{Float64}, b::Vector{Float64}, Nz, pchunks; w=2/3, Na=100, Ns=10, m=20, err_thresh=1e-8)
+function jacobi_preconditioned_gmres(A::SparseMatrixCSC, x0::Vector{Float64}, b::Vector{Float64}, Nz, pchunks; w=2/3, Na=10, Ns=100, m=20, err_thresh=1e-8)
 
     Nk = div(length(x0), Nz)
 
@@ -13,6 +13,8 @@ function jacobi_preconditioned_gmres(A::SparseMatrixCSC, x0::Vector{Float64}, b:
     end
 
     err = norm(A*x - b)
+
+    @info err
     if err > err_thresh
         zslices = collect(Iterators.partition(1:Nk*Nz, Nz))
         c = pmap(zslices) do inds
