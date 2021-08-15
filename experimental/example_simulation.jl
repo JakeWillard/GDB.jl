@@ -355,10 +355,17 @@ function test_simulate(Nt, sn, ste, sti, kdiff, dt, output_path, init_path, geo_
     STe = ste * Sp
     STi = sti * Sp
     kdiff_lnn, kdiff_lnTe, kdiff_lnTi, kdiff_u, kdiff_w, kdiff_A = kdiff[:]
-    @showprogress "Running GDB... " for t=2:Nt
-        leapfrog!(1, lnn, lnTe, lnTi, u, w, A, phi, psi, n, Te, Ti, Pe, Pi, j, jn, Sn, STe, STi, Dx, Dy, Dxy, Dxx, Dyy, Dxxx, Dyyy,
-                  Dxxy, Dxyy, Ds, Dss, dt, 10, K1, K2, H1, H2, H3, trgt_sgn, lcfs_avg, GC_nmann, GC_dchlt, GC_u, kdiff_lnn,
-                  kdiff_lnTe, kdiff_lnTi, kdiff_u, kdiff_w, kdiff_A, am, ad, ki, ke, er, eg, ev, de2, eta)
+
+    Nskip = 10
+    p = Progress(Nskip*(Nt-1), desc="Running GDB... ")
+    for t=2:Nt
+        for _=1:10
+            leapfrog!(lnn, lnTe, lnTi, u, w, A, phi, psi, n, Te, Ti, Pe, Pi, j, jn, Sn, STe, STi, Dx, Dy, Dxy, Dxx, Dyy, Dxxx, Dyyy,
+                      Dxxy, Dxyy, Ds, Dss, dt, 10, K1, K2, H1, H2, H3, trgt_sgn, lcfs_avg, GC_nmann, GC_dchlt, GC_u, kdiff_lnn,
+                      kdiff_lnTe, kdiff_lnTi, kdiff_u, kdiff_w, kdiff_A, am, ad, ki, ke, er, eg, ev, de2, eta)
+            next!(p)
+        end
+
 
         fid = h5open(output_path, "r+")
         fid["n"][:,t] = n[:]

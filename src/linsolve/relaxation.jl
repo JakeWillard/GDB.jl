@@ -16,7 +16,6 @@ function JacobiSmoother(A::SparseMatrixCSC, b::Vector{Float64}, w::Float64, pchu
     f = D * b
 
     chunksize = div(Nk, pchunks)
-    @info chunksize
     pslices = collect(Iterators.partition(1:Nk, chunksize))
     # pslices = UnitRange{Int64}[g[1]:g[end] for g in pgroups]
     slices = UnitRange{Int64}[]
