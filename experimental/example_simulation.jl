@@ -75,7 +75,7 @@ function save_ghost_conditions(fid, gc::GhostConditions, name::String)
     create_group(fid, name)
 
     save_sparse_matrix(fid, gc.Proj, "$(name)/Proj")
-    save_sparse_matrix(fid, gc.Extr, "$(name)/Extr")
+    save_sparse_matrix(fid, gc.Mirror, "$(name)/Mirror")
     fid["$(name)/swaps"] = gc.swaps[:,:]
 end
 
@@ -83,10 +83,10 @@ end
 function load_ghost_conditions(fid, name::String)
 
     Proj = load_sparse_matrix(fid, "$(name)/Proj")
-    Extr = load_sparse_matrix(fid, "$(name)/Extr")
+    Mirror = load_sparse_matrix(fid, "$(name)/Mirror")
     swaps = fid["$(name)/swaps"][:,:]
 
-    return GhostConditions(Proj, Extr, swaps)
+    return GhostConditions(Proj, Mirror, swaps)
 end
 
 
@@ -103,7 +103,7 @@ function example_geometry_setup(path::String, Nx, Ny)
 
     # define barriers for flux surfaces
     inner_flux = Barrier() do
-        func(x,y) = (y > -0.561) ? psi(x,y) : Inf
+        func(x,y) = (y > -0.561) ? psi(x,y) : abs(psi(x,y))
         rmap(x,y) = trace_reflection(x, y, psi, psi_in, 0.001)
         func, psi_in, rmap, 1
     end
@@ -131,8 +131,8 @@ function example_geometry_setup(path::String, Nx, Ny)
     # create Grid
     deltas = Float64[dp_in, 0.5*(dp_out + dp_priv), dr]
     barrs = [inner_flux, outer_flux, target]
-    grd = Grid(Nx, Ny, 1; Nbuffer=0) do
-        inside(x,y) = check_if_inside(x, y, 5*deltas, barrs)
+    grd = Grid(Nx, Ny, 1) do
+        inside(x,y) = check_if_inside(x, y, 10*deltas, barrs)
         r0 = Float64[0.5, -1]
         r1 = Float64[1.5, 1]
         inside, r0, r1
@@ -153,17 +153,19 @@ function example_geometry_setup(path::String, Nx, Ny)
     K2 = 100 * (I - K1)
 
     # H1, H2, and H3 are for defining boundary values.
-    h1 = h2 = h3 = ones(grd.Nk)
-    h1[pen[:,1] .!= 1.0] .= 0.0
-    h2[pen[:,2] .!= 1.0] .= 0.0
-    h3[pen[:,3] .!= 1.0] .= 0.0
+    h1 = ones(grd.Nk)
+    h2 = ones(grd.Nk)
+    h3 = ones(grd.Nk)
+    h1[pen[:,1] .!= 0.0] .= 0.0
+    h2[pen[:,2] .!= 0.0] .= 0.0
+    h3[pen[:,3] .!= 0.0] .= 0.0
     H1 = sparse(Diagonal(h1))
     H2 = sparse(Diagonal(h2))
     H3 = sparse(Diagonal(h3))
 
     # compute ghost-conditions
-    GC_dchlt = GhostConditions(2, 2, stencil2d(2, 2), barrs, grd)
-    GC_nmann = swap_sign(GC_dchlt, 1, 2, 3)
+    GC_nmann = GhostConditions(barrs, grd) #XXX this is backwards now I think.
+    GC_dchlt = swap_sign(GC_nmann, 1, 2, 3)
     GC_u = swap_sign(GC_nmann, 3)
 
     # define vector for function that is +1 on left plate and -1 on right plate
@@ -204,13 +206,21 @@ function example_physics_setup(R0, n0, T0, B0, init_path, geo_path)
     H1 = load_sparse_matrix(geofid, "H1")
     H2 = load_sparse_matrix(geofid, "H2")
     H3 = load_sparse_matrix(geofid, "H3")
+    FL_img = geofid["FL_img"][:,:]
     close(geofid)
 
     Minv = stencil1d(5)
+    MinvT = stencil2d(4, 4)
     Dx = derivative_matrix(1, 0, Minv, Minv, grd) * 0.3
     Dy = derivative_matrix(0, 1, Minv, Minv, grd) * 0.3
+    Dxy = derivative_matrix(1, 1, Minv, Minv, grd) * (0.3)^2
     Dxx = derivative_matrix(2, 0, Minv, Minv, grd) * (0.3)^2
     Dyy = derivative_matrix(0, 2, Minv, Minv, grd) * (0.3)^2
+    Dxxx = derivative_matrix(3, 0, Minv, Minv, grd) * (0.3)^3
+    Dyyy = derivative_matrix(0, 3, Minv, Minv, grd) * (0.3)^3
+    Dxxy = derivative_matrix(2, 1, Minv, Minv, grd) * (0.3)^3
+    Dxyy = derivative_matrix(1, 2, Minv, Minv, grd) * (0.3)^3
+    Ds, Dss = fieldline_derivatives(FL_img, 4, 4, MinvT, grd)
 
     psi_in = psi(1 - 0.28, 0)
     dp = abs(psi_in)
@@ -240,9 +250,21 @@ function example_physics_setup(R0, n0, T0, B0, init_path, geo_path)
     Pi_xx = Dxx * Pi
     Pi_yy = Dyy * Pi
     phi_b = bval_phi(w[:,2], Te, lcfs_avg, H1, H2, H3)
+    ad = 1.0 # XXX
     phi = solve_vorticity_eqn(phi_b, w[:,2], n, lnn_x, lnn_y, Pi_xx, Pi_yy, ad, Dx, Dy, Dxx, Dyy, GC_dchlt)
 
     fid = h5open(init_path, "w")
+    save_sparse_matrix(fid, Dx, "Dx")
+    save_sparse_matrix(fid, Dy, "Dy")
+    save_sparse_matrix(fid, Dxy, "Dxy")
+    save_sparse_matrix(fid, Dxx, "Dxx")
+    save_sparse_matrix(fid, Dyy, "Dyy")
+    save_sparse_matrix(fid, Dxxx, "Dxxx")
+    save_sparse_matrix(fid, Dyyy, "Dyyy")
+    save_sparse_matrix(fid, Dxxy, "Dxxy")
+    save_sparse_matrix(fid, Dxyy, "Dxyy")
+    save_sparse_matrix(fid, Ds, "Ds")
+    save_sparse_matrix(fid, Dss, "Dss")
     fid["lnn"] = lnn[:,:]
     fid["lnTe"] = lnTe[:,:]
     fid["lnTi"] = lnTi[:,:]
@@ -259,7 +281,8 @@ function example_physics_setup(R0, n0, T0, B0, init_path, geo_path)
     fid["j"] = j[:]
     fid["jn"] = jn[:]
     fid["Sp"] = Sp[:]
-    fid["params"] = Float64[am, ad, ki, ke, er, eg, ev, de2, eta]
+    fid["params"] = ones(Float64, 9)
+    # fid["params"] = Float64[am, ad, ki, ke, er, eg, ev, de2, eta]
     close(fid)
 end
 
@@ -282,6 +305,17 @@ function test_simulate(Nt, sn, ste, sti, kdiff, dt, output_path, init_path, geo_
     close(geofid)
 
     fid = h5open(init_path, "r")
+    Dx = load_sparse_matrix(fid, "Dx")
+    Dy = load_sparse_matrix(fid, "Dy")
+    Dxy = load_sparse_matrix(fid, "Dxy")
+    Dxx = load_sparse_matrix(fid, "Dxx")
+    Dyy = load_sparse_matrix(fid, "Dyy")
+    Dxxx = load_sparse_matrix(fid, "Dxxx")
+    Dyyy = load_sparse_matrix(fid, "Dyyy")
+    Dxxy = load_sparse_matrix(fid, "Dxxy")
+    Dxyy = load_sparse_matrix(fid, "Dxyy")
+    Ds = load_sparse_matrix(fid, "Ds")
+    Dss = load_sparse_matrix(fid, "Dss")
     lnn = fid["lnn"][:,:]
     lnTe = fid["lnTe"][:,:]
     lnTi = fid["lnTi"][:,:]
@@ -300,32 +334,48 @@ function test_simulate(Nt, sn, ste, sti, kdiff, dt, output_path, init_path, geo_
     Sp = fid["Sp"][:]
     am, ad, ki, ke, er, eg, ev, de2, eta = fid["params"][:]
     close(fid)
+    am, ad, ki, ke, er, eg, ev, de2, eta = ones(Float64, 9)
 
-    Minv = stencil1d(5)
-    MinvT = stencil2d(4, 4)
-    Dx = derivative_matrix(1, 0, Minv, Minv, grd) * 0.3
-    Dy = derivative_matrix(0, 1, Minv, Minv, grd) * 0.3
-    Dxy = derivative_matrix(1, 1, Minv, Minv, grd) * (0.3)^2
-    Dxx = derivative_matrix(2, 0, Minv, Minv, grd) * (0.3)^2
-    Dyy = derivative_matrix(0, 2, Minv, Minv, grd) * (0.3)^2
-    Dxxx = derivative_matrix(3, 0, Minv, Minv, grd) * (0.3)^3
-    Dyyy = derivative_matrix(0, 3, Minv, Minv, grd) * (0.3)^3
-    Dxxy = derivative_matrix(2, 1, Minv, Minv, grd) * (0.3)^3
-    Dxyy = derivative_matrix(1, 2, Minv, Minv, grd) * (0.3)^3
-    Ds, Dss = fieldline_derivatives(FL_img, 4, 4, MinvT, grd)
+    fid = h5open(output_path, "w")
+    create_dataset(fid, "n", datatype(Float64), dataspace(grd.Nk*grd.Nz,Nt), chunk=(grd.Nk*grd.Nz,1))
+    create_dataset(fid, "Te", datatype(Float64), dataspace(grd.Nk*grd.Nz,Nt), chunk=(grd.Nk*grd.Nz,1))
+    create_dataset(fid, "Ti", datatype(Float64), dataspace(grd.Nk*grd.Nz,Nt), chunk=(grd.Nk*grd.Nz,1))
+    create_dataset(fid, "u", datatype(Float64), dataspace(grd.Nk*grd.Nz,Nt), chunk=(grd.Nk*grd.Nz,1))
+    create_dataset(fid, "phi", datatype(Float64), dataspace(grd.Nk*grd.Nz,Nt), chunk=(grd.Nk*grd.Nz,1))
+    create_dataset(fid, "psi", datatype(Float64), dataspace(grd.Nk*grd.Nz,Nt), chunk=(grd.Nk*grd.Nz,1))
+    fid["n"][:,1] = n[:]
+    fid["Te"][:,1] = Te[:]
+    fid["Ti"][:,1] = Ti[:]
+    fid["u"][:,1] = u[:,2]
+    fid["phi"][:,1] = phi[:]
+    fid["psi"][:,1] = psi[:]
+    close(fid)
 
     Sn = sn * Sp
     STe = ste * Sp
     STi = sti * Sp
     kdiff_lnn, kdiff_lnTe, kdiff_lnTi, kdiff_u, kdiff_w, kdiff_A = kdiff[:]
-    return phi, grd
-    for t=1:Nt
-        leapfrog!(1, lnn, lnTe, lnTi, u, w, A, phi, psi, n, Te, Ti, Pe, Pi, j, jn, Sn, STe, STi, Dx, Dy, Dxy, Dxx, Dyy, Dxxx, Dyyy,
-                  Dxxy, Dxyy, Ds, Dss, dt, 10, K1, K2, H1, H2, H3, trgt_sgn, lcfs_avg, GC_nmann, GC_dchlt, GC_u, kdiff_lnn,
-                  kdiff_lnTe, kdiff_lnTi, kdiff_u, kdiff_w, kdiff_A, am, ad, ki, ke, er, eg, ev, de2, eta)
-        # write to output
-        # ;alksdjfl;kasjfl;sk
+
+    Nskip = 10
+    p = Progress(Nskip*(Nt-1), desc="Running GDB... ")
+    for t=2:Nt
+        for _=1:10
+            leapfrog!(lnn, lnTe, lnTi, u, w, A, phi, psi, n, Te, Ti, Pe, Pi, j, jn, Sn, STe, STi, Dx, Dy, Dxy, Dxx, Dyy, Dxxx, Dyyy,
+                      Dxxy, Dxyy, Ds, Dss, dt, 10, K1, K2, H1, H2, H3, trgt_sgn, lcfs_avg, GC_nmann, GC_dchlt, GC_u, kdiff_lnn,
+                      kdiff_lnTe, kdiff_lnTi, kdiff_u, kdiff_w, kdiff_A, am, ad, ki, ke, er, eg, ev, de2, eta)
+            next!(p)
+        end
+
+
+        fid = h5open(output_path, "r+")
+        fid["n"][:,t] = n[:]
+        fid["Te"][:,t] = Te[:]
+        fid["Ti"][:,t] = Ti[:]
+        fid["u"][:,t] = u[:,2]
+        fid["phi"][:,t] = phi[:]
+        fid["psi"][:,t] = psi[:]
+        close(fid)
+
     end
 
-    return n, grd
 end

@@ -1,40 +1,44 @@
 
-function compute_jacobi_matrices(A::SparseMatrixCSC, w::Float64)
+struct JacobiSmoother
 
-    # D = sparse(w*inv(Diagonal(A)))
-    D = w*sparse(Diagonal(1 ./ diag(A)))
-    M = I - D*A
-    return M, D
+    C :: SparseMatrixCSC
+    f :: Vector{Float64}
+    asynch_steps :: Int64
+    slices :: Vector{UnitRange}
+
 end
 
 
-function jacobi_relaxation(N::Int64, A::SparseMatrixCSC, M::SparseMatrixCSC, D::SparseMatrixCSC, x0::Vector{Float64}, b::Vector{Float64})
+function JacobiSmoother(A::SparseMatrixCSC, b::Vector{Float64}, w::Float64, pchunks, Nk, Nz, Na)
 
-    r = b - A*x0
-    x = zeros(Float64, length(r))
-    f = D * r
+    D = w*Diagonal(1 ./ diag(A))
+    C = I - D*A
+    f = D * b
 
-    for _=1:N
-        x[:] = M * x + f
+    chunksize = div(Nk, pchunks)
+    pslices = collect(Iterators.partition(1:Nk, chunksize))
+    # pslices = UnitRange{Int64}[g[1]:g[end] for g in pgroups]
+    slices = UnitRange{Int64}[]
+    for z=1:Nz
+        slices = [slices; [s .+ (z-1)*Nk for s in pslices]]
     end
 
-    return x0 + x
+    return JacobiSmoother(C, f, Na, pslices)
 end
 
 
+function Base.:*(J::JacobiSmoother, v::Vector{Float64})
 
-function asynch_jacobi_relaxation(N::Int64, M::SparseMatrixCSC, D::SparseMatrixCSC, x0::DArray, b::DArray)
+    out = pmap(J.slices) do inds
+        x = v[:]
+        C_loc = J.C[inds, :]
+        f_loc = J.f[inds]
 
-    DArray((size(x0)[1],), procs(x0), length(procs(x0))) do inds
-
-        Ms = M[inds[1],:]
-        Ds = D[inds[1],:]
-        xs = Array(x0)[:,1]
-        fs = Ds * Array(b)[:,1]
-        for _=1:N
-            xs[inds[1]] = Ms * xs + fs
+        for t=1:J.asynch_steps
+            x[inds] = C_loc * x + f_loc
         end
-        xs[inds[1],1]
+        x[inds]
     end
 
+    return vcat(out...)
 end

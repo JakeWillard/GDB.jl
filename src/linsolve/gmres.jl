@@ -67,7 +67,7 @@ function gmres_cycle(A::SparseMatrixCSC, x0::Vector{Float64}, b::Vector{Float64}
 end
 
 
-function gmres_solve(A::SparseMatrixCSC, x0::Vector{Float64}, b::Vector{Float64}, m::Int64; maxiters=10000, err_thresh = 1e-20)
+function gmres_solve(A::SparseMatrixCSC, x0::Vector{Float64}, b::Vector{Float64}, m::Int64; maxiters=10000, err_thresh = 1e-8)
 
     x = x0[:]
     err = 1.0
