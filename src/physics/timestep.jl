@@ -22,7 +22,7 @@ function solve_pde(A, x0, b, xb, gc::GhostConditions)
 
     An, B = require_boundary_conditions(A, gc)
     bn = gc.Proj*b - B*xb
-    x = jacobi_preconditioned_gmres(An, gc.Proj*x0, bn, 1, nprocs())
+    x = jacobi_preconditioned_gmres(An, gc.Proj*x0, bn, 1, 1)
     # x = An \ bn
     return gc.Mirror*transpose(gc.Proj)*x + (I - gc.Mirror)*xb
 end
