@@ -155,7 +155,7 @@ function simple_geometry_setup(path::String, Nx, Ny)
     save_grid(fid, grd, "Grid")
     save_sparse_matrix(fid, K1, "K1")
     save_sparse_matrix(fid, K2, "K2")
-    save_ghost_conditions(fid, gc, "gc")
+    save_ghost_conditions(fid, gc_nmann, "gc")
     close(fid)
 end
 
@@ -233,11 +233,12 @@ function simulate(Nt, k_w, k_psi, am, dt, output_path, init_path, geo_path)
     fid["psi"][:,1] = psi[:,2]
     close(fid)
 
-    Nskip = 10
+    Nskip = 1
     p = Progress(Nskip*(Nt-1), "Running simple model... ")
     for t=2:Nt
         for _=1:Nskip
             leapfrog!(w, psi, phi, Dx, Dxx, Dy, Dyy, K1, K2, gc, dt, am, k_psi, k_w)
+            next!(p)
         end
 
         fid = h5open(output_path, "r+")
