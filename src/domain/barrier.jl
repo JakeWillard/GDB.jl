@@ -144,3 +144,7 @@ end
 # constructors for cases where the "do-block" syntax might make the code more readable
 Barrier(f::Function) = Barrier(f()...)
 PolyBarrier(f::Function) = PolyBarrier(f())
+
+
+# might be convenient to generate a polygon from parameterized curve
+PolyBarrier(f::Function, N::Int64) = PolyBarrier(hcat(f.(LinRange(0, 1, N))))
