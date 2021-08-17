@@ -64,8 +64,18 @@ Grid(f::Function, Nx, Ny, Nz; Nbuffer=100) = Grid(f()..., Nx, Ny, Nz; Nbuffer=Nb
     vp = reshape(v, grd.Nk, :)[:,z]
     vp_cart = transpose(grd.Proj) * vp
     V = reshape(vp_cart, grd._Nx, grd._Ny)
+    Vplot = transpose(V[grd._Nbuffer+1:grd._Nx-grd._Nbuffer, grd._Nbuffer+1:grd._Ny-grd._Nbuffer] .* grd._nan_outside_boundaries)
 
-    transpose(V[grd._Nbuffer+1:grd._Nx-grd._Nbuffer, grd._Nbuffer+1:grd._Ny-grd._Nbuffer] .* grd._nan_outside_boundaries)
+    Nx = grd._Nx - 2*grd._Nbuffer
+    Ny = grd._Ny - 2*grd._Nbuffer
+    x = LinRange(grd.r0[1], grd.r1[1], Nx)
+    y = LinRange(grd.r0[2], grd.r1[2], Ny)
+
+    xlims --> (x[1], x[end])
+    ylims --> (y[1], y[end])
+    aspect_ratio --> :equal
+
+    x, y, Vplot
 end
 
 
@@ -76,7 +86,3 @@ function f_to_grid(f::Function, grd::Grid)
 
     return vcat([vec for _=1:grd.Nz]...)
 end
-
-
-# ability to call f_to_grid with convenient syntax: vec = f => grid
-Pair(f::Function, grd::Grid) = f_to_grid(f, grd)
