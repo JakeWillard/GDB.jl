@@ -73,6 +73,7 @@ Grid(f::Function, Nx, Ny, Nz; Nbuffer=100) = Grid(f()..., Nx, Ny, Nz; Nbuffer=Nb
 
     xlims --> (x[1], x[end])
     ylims --> (y[1], y[end])
+    size --> (1000, 1000)
     aspect_ratio --> :equal
 
     x, y, Vplot
