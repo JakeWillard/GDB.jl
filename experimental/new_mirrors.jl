@@ -124,16 +124,16 @@ function mirror_image(x, y, dx, dy, ms::MirrorSegments)
 end
 
 
-struct GhostImage
+struct GhostData
 
     Proj :: SparseMatrixCSC
-    Img :: SparseMatrixCSC
+    Mirror :: SparseMatrixCSC
     flip_factors :: Matrix{Int64}
 
 end
 
 
-function GhostImage(ms::MirrorSegments, grd::Grid)
+function GhostData(ms::MirrorSegments, grd::Grid)
 
     chnl = RemoteChannel(()->Channel{Bool}(), 1)
     p = Progress(grd.Nk, desc="Resolving mirrors... ")
@@ -169,26 +169,44 @@ function GhostImage(ms::MirrorSegments, grd::Grid)
 
     proj_j = M[1,:]
     proj_j = proj_j[proj_j .!= 0]
-    img_j = M[2,:]
+    mirr_j = M[2,:]
     flip_factors = M[3:end,:]
 
-    Img = sparse([1:grd.Nk...], img_j, ones(grd.Nk), grd.Nk, grd._Nx*grd._Ny) * transpose(grd.Proj)
+    Mirror = sparse([1:grd.Nk...], img_j, ones(grd.Nk), grd.Nk, grd._Nx*grd._Ny) * transpose(grd.Proj)
     Proj = sparse([1:length(proj_j)...], proj_j, ones(length(proj_j)), length(proj_j), grd.Nk)
 
-    return GhostImage(Proj, Img, flip_factors)
+    return GhostData(Proj, Mirror, flip_factors)
 end
 
 
-function flip_segments(gi::GhostImage, ranges...)
+function flip_segments(gd::GhostData, ranges...)
 
-    Img = gi.Img
+    Mirror = gd.Mirror
 
     for rng in ranges
-        factors = gi.flip_factors[rng,:]
+        factors = gd.flip_factors[rng,:]
         for j=1:size(factors)[1]
-            Img = Diagonal(vec(factors[j,:])) * Img
+            Mirror = Diagonal(vec(factors[j,:])) * Mirror
         end
     end
 
-    return GhostImage(gi.Proj, Img, gi.flip_factors)
+    return GhostImage(gd.Proj, Mirror, gd.flip_factors)
+end
+
+
+function extrapolate_values(x::Vector{Float64}, xb::Vector{Float64}, gd::GhostData)
+
+    return gd.Mirror*transpose(gc.Proj)*x + (I - gd.Mirror)*xb
+end
+
+
+function require_boundary_conditions(A::SparseMatrixCSC, gd::GhostData)
+
+    P = gd.Proj
+    Pt = transpose(P)
+
+    Anew = P*A*gd.Mirror*Pt
+    Bterm = P*A*(I - gd.Mirror)
+
+    return Anew, Bterm
 end

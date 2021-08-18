@@ -1,0 +1,7 @@
+
+
+TODO:
+  ☐ fix simulation setup to find vertices for inner and outer boundaries.
+  ☐ fix io to work for GhostData and not GhostConditions
+  ☐ fix simple_model.jl to depend on GhostData and not GhostConditions
+  ☐
