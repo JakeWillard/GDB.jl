@@ -19,8 +19,7 @@ function regula_falsi(f::Function, val::Float64, bracket1::Vector{Float64}, brac
     b = bracket2[:]
     fa = f(a) - val
     fb = f(b) - val
-    # c = (a*fb - b*fa) / (fb - fa)
-    c = (a + b) / 2
+    c = (a*fb - b*fa) / (fb - fa)
     fc = f(c) - val
 
     while abs(fc) > 1e-8
@@ -34,8 +33,7 @@ function regula_falsi(f::Function, val::Float64, bracket1::Vector{Float64}, brac
         end
         fa = f(a) - val
         fb = f(b) - val
-        c = (a + b) / 2
-        # c = (a*fb - b*fa) / (fb - fa)
+        c = (a*fb - b*fa) / (fb - fa)
         fc = f(c) - val
     end
 
@@ -70,17 +68,37 @@ function conservative_step(r::Vector{Float64}, b::Function, psi::Function, ds::F
 end
 
 
-function trace_fieldline(x0, y0, b::Function, psi::Function, stop_condition::Function, ds::Float64)
 
-    r = Float64[x0, y0]
-    deltaS = 0
+function trace_fieldline(stop_condition::Function, r0::Vector{Float64}, b::Function, psi::Function, ds::Float64)
 
+    r = r0[:]
+    deltaS = 0.0
+
+    points = Vector{Float64}[r0]
     while !stop_condition(r)
         rnew, dsnew = conservative_step(r, b, psi, ds)
         r[:] = rnew
         deltaS += dsnew
-        @info psi(r)
+        append!(points, [rnew])
     end
 
-    return r, deltaS
+    return hcat(points...), deltaS
+end
+
+
+function trace_fieldline(N::Int64, r0::Vector{Float64}, b::Function, psi::Function, ds::Float64)
+
+    r = r0[:]
+    deltaS = 0.0
+
+    points = zeros(2, N)
+    points[:,1] = r[:]
+    for s=2:N
+        rnew, dsnew = conservative_step(r, b, psi, ds)
+        r[:] = rnew
+        deltaS += dsnew
+        points[:,s] = r
+    end
+
+    return points, deltaS
 end
