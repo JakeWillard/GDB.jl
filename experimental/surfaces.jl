@@ -58,7 +58,8 @@ function conservative_step(r::Vector{Float64}, b::Function, psi::Function, ds::F
     rp = rk4_step(r, b, ds)
 
     # compute correction using root finding algorithm
-    en = [0 -1; 1 0] * b(rp)
+    en = zeros(length(rp))
+    en[1:2] = [0 -1; 1 0] * b(rp)[1:2] / norm(b(rp)[1:2])
     bracket1 = rp + ds*en
     bracket2 = rp - ds*en
     rc = regula_falsi(psi, psi(r), bracket1, bracket2)
@@ -91,7 +92,7 @@ function trace_fieldline(N::Int64, r0::Vector{Float64}, b::Function, psi::Functi
     r = r0[:]
     deltaS = 0.0
 
-    points = zeros(2, N)
+    points = zeros(length(r0), N)
     points[:,1] = r[:]
     for s=2:N
         rnew, dsnew = conservative_step(r, b, psi, ds)
