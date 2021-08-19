@@ -3,6 +3,6 @@
 TODO:
   ✔ make new tracing algorithm work in 3d and 2d @done(2021-08-18 18:44) @project(TODO)
   ☐ fix simulation setup to find vertices for inner and outer boundaries.
-  ☐ fix io to work for GhostData and not GhostConditions
-  ☐ fix simple_model.jl to depend on GhostData and not GhostConditions
+  ✔ fix io to work for GhostData and not GhostConditions @done(2021-08-18 22:31) @project(TODO)
+  ✔ fix simple_model.jl to depend on GhostData and not GhostConditions @done(2021-08-18 22:31) @project(TODO)
   ☐

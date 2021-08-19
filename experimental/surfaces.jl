@@ -19,7 +19,8 @@ function regula_falsi(f::Function, val::Float64, bracket1::Vector{Float64}, brac
     b = bracket2[:]
     fa = f(a) - val
     fb = f(b) - val
-    c = (a*fb - b*fa) / (fb - fa)
+    c = (a + b)/2
+    # c = (a*fb - b*fa) / (fb - fa)
     fc = f(c) - val
 
     while abs(fc) > 1e-8
@@ -33,7 +34,8 @@ function regula_falsi(f::Function, val::Float64, bracket1::Vector{Float64}, brac
         end
         fa = f(a) - val
         fb = f(b) - val
-        c = (a*fb - b*fa) / (fb - fa)
+        c = (a + b)/2
+        # c = (a*fb - b*fa) / (fb - fa)
         fc = f(c) - val
     end
 
@@ -75,14 +77,17 @@ function trace_fieldline(stop_condition::Function, r0::Vector{Float64}, b::Funct
     r = r0[:]
     deltaS = 0.0
 
+    prog = ProgressUnknown("Tracing fieldline... ", spinner=true)
     points = Vector{Float64}[r0]
     while !stop_condition(r)
         rnew, dsnew = conservative_step(r, b, psi, ds)
         r[:] = rnew
         deltaS += dsnew
         append!(points, [rnew])
+        next!(prog)
     end
 
+    finish!(prog)
     return hcat(points...), deltaS
 end
 

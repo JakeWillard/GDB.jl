@@ -68,25 +68,113 @@ function load_grid(fid, name::String)
 end
 
 
-function save_ghost_conditions(fid, gc::GhostConditions, name::String)
+function save_ghost_data(fid, gd::GhostData, name::String)
 
     # create group
     create_group(fid, name)
 
-    save_sparse_matrix(fid, gc.Proj, "$(name)/Proj")
-    save_sparse_matrix(fid, gc.Mirror, "$(name)/Mirror")
-    fid["$(name)/swaps"] = gc.swaps[:,:]
+    save_sparse_matrix(fid, gd.Proj, "$(name)/Proj")
+    save_sparse_matrix(fid, gd.Mirror, "$(name)/Mirror")
+    fid["$(name)/flip"] = gd.flip_factors[:,:]
 end
 
 
-function load_ghost_conditions(fid, name::String)
+function load_ghost_data(fid, name::String)
 
     Proj = load_sparse_matrix(fid, "$(name)/Proj")
     Mirror = load_sparse_matrix(fid, "$(name)/Mirror")
-    swaps = fid["$(name)/swaps"][:,:]
+    flip_factors = fid["$(name)/flip"][:,:]
 
-    return GhostConditions(Proj, Mirror, swaps)
+    return GhostData(Proj, Mirror, flip_factors)
 end
+
+
+function solovev_vertices()
+
+    # define the magnetic field
+    psi, bx, by, bz = solovev_flux_function(0.1, 0.1, 0.3, 1.7, 10.0, downsep=[1, -0.561])
+    bp(r) = Float64[bx(r...), by(r...)]
+
+    # values for flux surfaces
+    psi_in = psi(1 - 0.28, 0)
+    psi_out = psi(1 - 0.34, 0)
+    psi_priv = psi(1, -(0.561 + 0.01))
+
+    # find where the inner flux surface intersects y=0 on the outboard side
+    bracket1 = [1.0, 0.0]
+    bracket2 = [2.0, 0.0]
+    r0 = regula_falsi(r->psi(r...), psi_in, bracket1, bracket2)
+
+    # resolve inner boundary
+    inner_chain_1, _ = trace_fieldline(r0, bp, r->psi(r...), 0.001) do r
+        r[2] < 0
+    end
+    inner_chain_2, _ = trace_fieldline(inner_chain_1[:,end], bp, r->psi(r...), 0.001) do r
+        r[2] > 0
+    end
+    skip = maximum([div(size(inner_chain_1)[2], 30), 1])
+    inner_chain = hcat(inner_chain_1[:,1:skip:end-1], inner_chain_2[:,1:skip:end-1], inner_chain_1[:,1])
+    Nin = size(inner_chain)[2] - 1
+    @info Nin=Nin
+
+    # find where outer flux surface intersects right diverter plate
+    bracket1 = [1.0, -(0.561 + 0.04)]
+    bracket2 = [2.0, -(0.561 + 0.04)]
+    r0 = regula_falsi(r->psi(r...), psi_out, bracket1, bracket2)
+
+    # resolve outer flux surface
+    outer_chain, _ = trace_fieldline(r0, bp, r->psi(r...), 0.001) do r
+        r[2] < -(0.561 + 0.04)
+    end
+    skip = maximum([div(size(outer_chain)[2], 40), 1])
+    outer_chain = outer_chain[:,1:skip:end]
+    Nout = size(outer_chain)[2]
+    @info Nout=Nout
+
+    # find where outer flux surface intersects left diverter plate, add to outer_chain
+    bracket1 = [0.0, -(0.561 + 0.04)]
+    bracket2 = [1.0, -(0.561 + 0.04)]
+    rl = regula_falsi(r->psi(r...), psi_out, bracket1, bracket2)
+    outer_chain = hcat(outer_chain, rl)
+
+    # find where private flux surface intersects left diverter plate
+    bracket1 = [rl[1], -(0.561 + 0.04)]
+    bracket2 = [1.0, -(0.561 + 0.04)]
+    rl = regula_falsi(r->psi(r...), psi_priv, bracket1, bracket2)
+
+    # trace private flux surface
+    private_chain, _ = trace_fieldline(rl, r->-bp(r), r->psi(r...), 0.001) do r
+        r[2] < -(0.561 + 0.04)
+    end
+    skip = maximum([div(size(private_chain)[2], 20), 1])
+    private_chain = private_chain[:,1:skip:end]
+    outer_chain = hcat(outer_chain, private_chain)
+    Npriv = size(private_chain)[2]
+    @info Npriv=Npriv
+
+    # find where private flux surface intersects right diverter plate
+    bracket1 = [1.0, -(0.561 + 0.04)]
+    bracket2 = [2.0, -(0.561 + 0.04)]
+    rr = regula_falsi(r->psi(r...), psi_priv, bracket1, bracket2)
+    outer_chain = hcat(outer_chain, rr, outer_chain[:,1])
+
+    Nv = Nin + Nout + Npriv + 2
+    verts = zeros(2, 2, Nv)
+
+    verts[:,1,1:Nin] = inner_chain[:,1:Nin]
+    verts[:,2,1:Nin] = inner_chain[:,2:Nin+1]
+    verts[:,1,Nin+1:end] = outer_chain[:,1:end-1]
+    verts[:,2,Nin+1:end] = outer_chain[:,2:end]
+
+    return verts
+end
+
+
+
+
+
+
+
 
 
 function simple_geometry_setup(path::String, Nx, Ny)
