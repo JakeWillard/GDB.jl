@@ -89,7 +89,9 @@ function load_ghost_data(fid, name::String)
 end
 
 
-function solovev_vertices()
+function solovev_vertices(N1, N2, N3)
+
+    count = 0
 
     # define the magnetic field
     psi, bx, by, bz = solovev_flux_function(0.1, 0.1, 0.3, 1.7, 10.0, downsep=[1, -0.561])
@@ -112,10 +114,12 @@ function solovev_vertices()
     inner_chain_2, _ = trace_fieldline(inner_chain_1[:,end], bp, r->psi(r...), 0.001) do r
         r[2] > 0
     end
-    skip = maximum([div(size(inner_chain_1)[2], 30), 1])
+    skip = maximum([div(size(inner_chain_1)[2], N1), 1])
     inner_chain = hcat(inner_chain_1[:,1:skip:end-1], inner_chain_2[:,1:skip:end-1], inner_chain_1[:,1])
     Nin = size(inner_chain)[2] - 1
-    @info Nin=Nin
+
+    inner_range = 1:Nin
+    count += Nin
 
     # find where outer flux surface intersects right diverter plate
     bracket1 = [1.0, -(0.561 + 0.04)]
@@ -126,16 +130,21 @@ function solovev_vertices()
     outer_chain, _ = trace_fieldline(r0, bp, r->psi(r...), 0.001) do r
         r[2] < -(0.561 + 0.04)
     end
-    skip = maximum([div(size(outer_chain)[2], 40), 1])
+    skip = maximum([div(size(outer_chain)[2], N2), 1])
     outer_chain = outer_chain[:,1:skip:end]
     Nout = size(outer_chain)[2]
-    @info Nout=Nout
+
+    outer_range_1 = count+1:count+Nout
+    count += Nout
 
     # find where outer flux surface intersects left diverter plate, add to outer_chain
     bracket1 = [0.0, -(0.561 + 0.04)]
     bracket2 = [1.0, -(0.561 + 0.04)]
     rl = regula_falsi(r->psi(r...), psi_out, bracket1, bracket2)
     outer_chain = hcat(outer_chain, rl)
+
+    div_range_1 = count+1:count+1
+    count += 1
 
     # find where private flux surface intersects left diverter plate
     bracket1 = [rl[1], -(0.561 + 0.04)]
@@ -146,17 +155,22 @@ function solovev_vertices()
     private_chain, _ = trace_fieldline(rl, r->-bp(r), r->psi(r...), 0.001) do r
         r[2] < -(0.561 + 0.04)
     end
-    skip = maximum([div(size(private_chain)[2], 20), 1])
+    skip = maximum([div(size(private_chain)[2], N3), 1])
     private_chain = private_chain[:,1:skip:end]
     outer_chain = hcat(outer_chain, private_chain)
     Npriv = size(private_chain)[2]
-    @info Npriv=Npriv
+
+    outer_range_2 = count+1:count+Npriv
+    count += Npriv
 
     # find where private flux surface intersects right diverter plate
     bracket1 = [1.0, -(0.561 + 0.04)]
     bracket2 = [2.0, -(0.561 + 0.04)]
     rr = regula_falsi(r->psi(r...), psi_priv, bracket1, bracket2)
     outer_chain = hcat(outer_chain, rr, outer_chain[:,1])
+
+    div_range_2 = count+1:count+1
+    count += 1
 
     Nv = Nin + Nout + Npriv + 2
     verts = zeros(2, 2, Nv)
@@ -165,60 +179,19 @@ function solovev_vertices()
     verts[:,2,1:Nin] = inner_chain[:,2:Nin+1]
     verts[:,1,Nin+1:end] = outer_chain[:,1:end-1]
     verts[:,2,Nin+1:end] = outer_chain[:,2:end]
+    orientations = ones(Int64, Nv)
+    orientations[1:Nin] .= -1
 
-    return verts
+    return MirrorSegments(verts, orientations), [inner_range, outer_range_1, outer_range_2, div_range_1, div_range_2]
 end
-
-
-
-
-
-
-
 
 
 function simple_geometry_setup(path::String, Nx, Ny)
 
-    # define the magnetic field
-    psi, bx, by, bz = solovev_flux_function(0.1, 0.1, 0.3, 1.7, 10.0, downsep=[1, -0.561])
+    ms, ranges = solovev_vertices(40, 40, 40)
 
-    # values for flux surfaces
-    psi_in = psi(1 - 0.28, 0)
-    psi_out = psi(1 - 0.34, 0)
-    psi_priv = psi(1, -(0.561 + 0.01))
-
-    # define barriers for flux surfaces
-    inner_flux = Barrier() do
-        func(x,y) = (y > -0.561) ? psi(x,y) : abs(psi(x,y))
-        rmap(x,y) = trace_reflection(x, y, psi, psi_in, 0.001)
-        func, psi_in, rmap, 1
-    end
-
-    outer_flux = Barrier() do
-        func(x,y) = (norm([x-1,y+0.6]) > 0.05) ? psi(x,y) : psi_out + psi_priv - psi(x,y)
-        rmap(x,y) = trace_reflection(x, y, func, psi_out, 0.001)
-        func, psi_out, rmap, -1
-    end
-
-    # define barrier for divertor target plates
-    target = Barrier() do
-        func(x,y) = y
-        val = -(0.561 + 0.04)
-        rmap(x,y) = x, 2*val - y
-        func, val, rmap, 1
-    end
-
-    # compute step function widths
-    dr = 0.01
-    dp_in = abs(ForwardDiff.derivative(u -> psi(u,0), 0.7)) * dr
-    dp_out = abs(ForwardDiff.derivative(u -> psi(u,0), 0.6)) * dr
-    dp_priv = abs(ForwardDiff.derivative(u -> psi(1,u), -(0.561 + 0.05))) * dr
-
-    # create Grid
-    deltas = Float64[dp_in, 0.5*(dp_out + dp_priv), dr]
-    barrs = [inner_flux, outer_flux, target]
     grd = Grid(Nx, Ny, 1) do
-        inside(x,y) = check_if_inside(x, y, 10*deltas, barrs)
+        inside(x,y) = distance_to_mirror(x, y, ms)[1] > -0.05
         r0 = Float64[0.5, -1]
         r1 = Float64[1.5, 1]
         inside, r0, r1
@@ -236,60 +209,131 @@ function simple_geometry_setup(path::String, Nx, Ny)
     K1 = sparse(Diagonal(pen[:,1] .* pen[:,2] .* pen[:,3]))
     K2 = 100 * (I - K1)
 
-    gc_nmann = GhostConditions(barrs, grd)
-    gc = swap_sign(gc_nmann, 1, 2, 3)
 
-    fid = h5open(path, "w")
-    save_grid(fid, grd, "Grid")
-    save_sparse_matrix(fid, K1, "K1")
-    save_sparse_matrix(fid, K2, "K2")
-    save_ghost_conditions(fid, gc_nmann, "gc")
-    close(fid)
+    return grd
 end
 
 
-function simple_physics_setup(w0, psi0, L_w, L_psi, init_path::String, geo_path::String)
 
-    fid = h5open(geo_path, "r")
-    grd = load_grid(fid, "Grid")
-    gc = load_ghost_conditions(fid, "gc")
-    close(fid)
 
-    psi_func, bx, by, bz = solovev_flux_function(0.1, 0.1, 0.3, 1.7, 10.0, downsep=[1, -0.561])
-    psi_mid = psi_func(0.65, 0)
-    dp_w = abs(ForwardDiff.derivative(u -> psi_func(u,0), 0.65)) * L_w
-    dp_psi = dp_w * L_psi / L_w
 
-    w_vec = f_to_grid(grd) do x,y
-        w0*tanh((psi_func(x,y) - psi_mid) / dp_w)
-    end
-    psi_vec = f_to_grid(grd) do x,y
-        psi0*tanh((psi_func(x,y) - psi_mid) / dp_psi)
-    end
 
-    w = hcat(w_vec, w_vec, w_vec)
-    psi = hcat(psi_vec, psi_vec, psi_vec)
-
-    # compute derivatives
-    Minv = stencil1d(3)
-    Dx = derivative_matrix(1, 0, Minv, Minv, grd) * 0.3
-    Dy = derivative_matrix(0, 1, Minv, Minv, grd) * 0.3
-    Dxx = derivative_matrix(2, 0, Minv, Minv, grd) * (0.3)^2
-    Dyy = derivative_matrix(0, 2, Minv, Minv, grd) * (0.3)^2
-
-    # solve vorticity equation
-    phi = solve_vorticity_eqn(zeros(grd.Nk), w[:,2], Dxx, Dyy, gc)
-
-    fid = h5open(init_path, "w")
-    save_sparse_matrix(fid, Dx, "Dx")
-    save_sparse_matrix(fid, Dy, "Dy")
-    save_sparse_matrix(fid, Dxx, "Dxx")
-    save_sparse_matrix(fid, Dyy, "Dyy")
-    fid["w"] = w[:,:]
-    fid["phi"] = phi[:]
-    fid["psi"] = psi[:,:]
-    close(fid)
-end
+#
+#
+#
+# function simple_geometry_setup(path::String, Nx, Ny)
+#
+#     # define the magnetic field
+#     psi, bx, by, bz = solovev_flux_function(0.1, 0.1, 0.3, 1.7, 10.0, downsep=[1, -0.561])
+#
+#     # values for flux surfaces
+#     psi_in = psi(1 - 0.28, 0)
+#     psi_out = psi(1 - 0.34, 0)
+#     psi_priv = psi(1, -(0.561 + 0.01))
+#
+#     # define barriers for flux surfaces
+#     inner_flux = Barrier() do
+#         func(x,y) = (y > -0.561) ? psi(x,y) : abs(psi(x,y))
+#         rmap(x,y) = trace_reflection(x, y, psi, psi_in, 0.001)
+#         func, psi_in, rmap, 1
+#     end
+#
+#     outer_flux = Barrier() do
+#         func(x,y) = (norm([x-1,y+0.6]) > 0.05) ? psi(x,y) : psi_out + psi_priv - psi(x,y)
+#         rmap(x,y) = trace_reflection(x, y, func, psi_out, 0.001)
+#         func, psi_out, rmap, -1
+#     end
+#
+#     # define barrier for divertor target plates
+#     target = Barrier() do
+#         func(x,y) = y
+#         val = -(0.561 + 0.04)
+#         rmap(x,y) = x, 2*val - y
+#         func, val, rmap, 1
+#     end
+#
+#     # compute step function widths
+#     dr = 0.01
+#     dp_in = abs(ForwardDiff.derivative(u -> psi(u,0), 0.7)) * dr
+#     dp_out = abs(ForwardDiff.derivative(u -> psi(u,0), 0.6)) * dr
+#     dp_priv = abs(ForwardDiff.derivative(u -> psi(1,u), -(0.561 + 0.05))) * dr
+#
+#     # create Grid
+#     deltas = Float64[dp_in, 0.5*(dp_out + dp_priv), dr]
+#     barrs = [inner_flux, outer_flux, target]
+#     grd = Grid(Nx, Ny, 1) do
+#         inside(x,y) = check_if_inside(x, y, 10*deltas, barrs)
+#         r0 = Float64[0.5, -1]
+#         r1 = Float64[1.5, 1]
+#         inside, r0, r1
+#     end
+#
+#     # compute penalization values as step functions
+#     pen = zeros(grd.Nk, 3)
+#     for i=1:3
+#         pen[:,i] = f_to_grid(grd) do x,y
+#             smoothstep(x, y, deltas[i], barrs[i])
+#         end
+#     end
+#
+#     # K1 and K2 are operators for penalized forward-euler timesteps
+#     K1 = sparse(Diagonal(pen[:,1] .* pen[:,2] .* pen[:,3]))
+#     K2 = 100 * (I - K1)
+#
+#     gc_nmann = GhostConditions(barrs, grd)
+#     gc = swap_sign(gc_nmann, 1, 2, 3)
+#
+#     fid = h5open(path, "w")
+#     save_grid(fid, grd, "Grid")
+#     save_sparse_matrix(fid, K1, "K1")
+#     save_sparse_matrix(fid, K2, "K2")
+#     save_ghost_conditions(fid, gc_nmann, "gc")
+#     close(fid)
+# end
+#
+#
+# function simple_physics_setup(w0, psi0, L_w, L_psi, init_path::String, geo_path::String)
+#
+#     fid = h5open(geo_path, "r")
+#     grd = load_grid(fid, "Grid")
+#     gc = load_ghost_conditions(fid, "gc")
+#     close(fid)
+#
+#     psi_func, bx, by, bz = solovev_flux_function(0.1, 0.1, 0.3, 1.7, 10.0, downsep=[1, -0.561])
+#     psi_mid = psi_func(0.65, 0)
+#     dp_w = abs(ForwardDiff.derivative(u -> psi_func(u,0), 0.65)) * L_w
+#     dp_psi = dp_w * L_psi / L_w
+#
+#     w_vec = f_to_grid(grd) do x,y
+#         w0*tanh((psi_func(x,y) - psi_mid) / dp_w)
+#     end
+#     psi_vec = f_to_grid(grd) do x,y
+#         psi0*tanh((psi_func(x,y) - psi_mid) / dp_psi)
+#     end
+#
+#     w = hcat(w_vec, w_vec, w_vec)
+#     psi = hcat(psi_vec, psi_vec, psi_vec)
+#
+#     # compute derivatives
+#     Minv = stencil1d(3)
+#     Dx = derivative_matrix(1, 0, Minv, Minv, grd) * 0.3
+#     Dy = derivative_matrix(0, 1, Minv, Minv, grd) * 0.3
+#     Dxx = derivative_matrix(2, 0, Minv, Minv, grd) * (0.3)^2
+#     Dyy = derivative_matrix(0, 2, Minv, Minv, grd) * (0.3)^2
+#
+#     # solve vorticity equation
+#     phi = solve_vorticity_eqn(zeros(grd.Nk), w[:,2], Dxx, Dyy, gc)
+#
+#     fid = h5open(init_path, "w")
+#     save_sparse_matrix(fid, Dx, "Dx")
+#     save_sparse_matrix(fid, Dy, "Dy")
+#     save_sparse_matrix(fid, Dxx, "Dxx")
+#     save_sparse_matrix(fid, Dyy, "Dyy")
+#     fid["w"] = w[:,:]
+#     fid["phi"] = phi[:]
+#     fid["psi"] = psi[:,:]
+#     close(fid)
+# end
 
 
 function simulate(Nt, k_w, k_psi, am, dt, output_path, init_path, geo_path)
