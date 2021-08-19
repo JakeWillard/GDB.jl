@@ -173,8 +173,17 @@ function solovev_vertices(N1, N2, N3)
     count += 1
 
     Nv = Nin + Nout + Npriv + 2
-    verts = zeros(2, 2, Nv)
 
+    inner_boundary = fill(false, Nv)
+    inner_boundary[inner_range] .= true
+    outer_boundary = fill(false, Nv)
+    outer_boundary[outer_range_1] .= true
+    outer_boundary[outer_range_2] .= true
+    div_boundary = fill(false, Nv)
+    div_boundary[div_range_1] .= true
+    div_boundary[div_range_2] .= true
+
+    verts = zeros(2, 2, Nv)
     verts[:,1,1:Nin] = inner_chain[:,1:Nin]
     verts[:,2,1:Nin] = inner_chain[:,2:Nin+1]
     verts[:,1,Nin+1:end] = outer_chain[:,1:end-1]
@@ -182,13 +191,13 @@ function solovev_vertices(N1, N2, N3)
     orientations = ones(Int64, Nv)
     orientations[1:Nin] .= -1
 
-    return MirrorSegments(verts, orientations), [inner_range, outer_range_1, outer_range_2, div_range_1, div_range_2]
+    return MirrorSegments(verts, orientations), inner_boundary, outer_boundary, div_boundary
 end
 
 
 function simple_geometry_setup(path::String, Nx, Ny)
 
-    ms, ranges = solovev_vertices(40, 40, 40)
+    ms, inner_boundary, outer_boundary, div_boundary = solovev_vertices(40, 40, 40)
 
     grd = Grid(Nx, Ny, 1) do
         inside(x,y) = distance_to_mirror(x, y, ms)[1] > -0.05
@@ -199,18 +208,28 @@ function simple_geometry_setup(path::String, Nx, Ny)
 
     # compute penalization values as step functions
     pen = zeros(grd.Nk, 3)
-    for i=1:3
-        pen[:,i] = f_to_grid(grd) do x,y
-            smoothstep(x, y, deltas[i], barrs[i])
-        end
+    pen[:,1] = f_to_grd(grd) do x,y
+        smoothstep(x, y, 0.02, 0.02, ms[inner_boundary])
+    end
+    pen[:,2] = f_to_grd(grd) do x,y
+        smoothstep(x, y, 0.02, 0.02, ms[outer_boundary])
+    end
+    pen[:,3] = f_to_grd(grd) do x,y
+        smoothstep(x, y, 0.02, 0.02, ms[div_boundary])
     end
 
     # K1 and K2 are operators for penalized forward-euler timesteps
     K1 = sparse(Diagonal(pen[:,1] .* pen[:,2] .* pen[:,3]))
     K2 = 100 * (I - K1)
 
+    gd_nmann = GhotData(ms, grd)
 
-    return grd
+    fid = h5open(path, "w")
+    save_grid(fid, grd, "Grid")
+    save_sparse_matrix(fid, K1, "K1")
+    save_sparse_matrix(fid, K2, "K2")
+    save_ghost_data(fid, gd_nmann, "gd")
+    close(fid)
 end
 
 

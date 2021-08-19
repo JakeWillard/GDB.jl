@@ -17,15 +17,15 @@ function distance_to_segment(x, y, vert0::Vector{Float64}, vert1::Vector{Float64
 end
 
 
-function mirror_image(x, y, dx, dy, vert0::Vector{Float64}, vert1::Vector{Float64})
+function mirror_image(x, y, dx, dy, f::Function)
 
     i = 0
     j = 0
     dist = 0
     steps = 0
 
-    while distance_to_segment(x, y, vert0, vert1) < 0
-        hs = hcat([[distance_to_segment(x+ii*dx, y+jj*dy, vert0, vert1) for ii=-1:1] for jj=-1:1]...)
+    while f(x,y) < 0
+        hs = hcat([[f(x+ii*dx, y+jj*dy) for ii=-1:1] for jj=-1:1]...)
         di, dj = Tuple(findmax(hs)[2]) .- 2
         x += di*grd.dx
         y += dj*grd.dy
@@ -36,7 +36,7 @@ function mirror_image(x, y, dx, dy, vert0::Vector{Float64}, vert1::Vector{Float6
     end
 
     while (dist > 0) && (steps > 0)
-        hs = hcat([[distance_to_segment(x+ii*dx, y+jj*dy, vert0, vert1) for ii=-1:1] for jj=-1:1]...)
+        hs = hcat([[f(x+ii*dx, y+jj*dy) for ii=-1:1] for jj=-1:1]...)
         di, dj = Tuple(findmax(hs)[2]) .- 2
         x += di*grd.dx
         y += dj*grd.dy
@@ -53,6 +53,9 @@ end
 struct MirrorSegments
     verts :: Array{Float64, 3}
     orientations :: Vector{Int64}
+
+    Base.getindex(ms::MirrorSegments, i) = MirrorSegments(ms.verts[:,:,i], ms.orientations[i])
+    MirrorSegments(verts, orientations) = new(verts, orientations)
 end
 
 
@@ -113,17 +116,27 @@ function distance_to_mirror(x, y, ms::MirrorSegments)
 end
 
 
-function mirror_image(x, y, dx, dy, ms::MirrorSegments)
+function smoothstep(x, y, s0, ds, ms::MirrorSegments)
 
-    # find closest segment
-    _, k = distance_to_mirror(x, y, ms)
-    vert0 = ms.verts[:,1,k]
-    vert1 = ms.verts[:,2,k]
-
-    return mirror_image(x, y, dx, dy, vert0, vert1)
+    u = (distance_to_mirror(x, y, ms) - s0) / ds
+    return (u < 0) ? 0.0 : ((0 < u < 1) ? 3*u^2 - 2*u^3 : 1.0)
 end
 
 
+function mirror_image(x, y, dx, dy, ms::MirrorSegments)
+
+    return mirror_image(x, y, dx, dy, (x,y) -> distance_to_mirror(x,y,ms)[1])
+end
+
+
+
+
+
+
+
+
+
+# GOES IN DIFFERENT FILE
 struct GhostData
 
     Proj :: SparseMatrixCSC
@@ -179,15 +192,12 @@ function GhostData(ms::MirrorSegments, grd::Grid)
 end
 
 
-function flip_segments(gd::GhostData, ranges...)
+function flip_segments(gd::GhostData, bdry)
 
     Mirror = gd.Mirror
-
-    for rng in ranges
-        factors = gd.flip_factors[rng,:]
-        for j=1:size(factors)[1]
-            Mirror = Diagonal(vec(factors[j,:])) * Mirror
-        end
+    fac = gd.flip_factors[bdry]
+    for j=1:size(factors)[1]
+        Mirror = Diagonal(vec(fac[j,:])) * Mirror
     end
 
     return GhostImage(gd.Proj, Mirror, gd.flip_factors)
