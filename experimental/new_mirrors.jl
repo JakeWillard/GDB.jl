@@ -7,12 +7,10 @@ function distance_to_segment(x, y, vert0::Vector{Float64}, vert1::Vector{Float64
     u = xs * cos(t) + ys * sin(t)
     v = -xs * sin(t) + ys * cos(t)
 
-    if u < 0
-        return norm([x,y] - vert0) * sign(v)
-    elseif 0 <= u < norm(vert1 - vert0)
-        return v
+    if 0 <= u < norm(vert1 - vert0)
+        return abs(v)
     else
-        return norm([x,y] - vert1) * sign(v)
+        return norm([x,y] - vert1)
     end
 end
 
@@ -27,8 +25,8 @@ function mirror_image(x, y, dx, dy, f::Function)
     while f(x,y) < 0
         hs = hcat([[f(x+ii*dx, y+jj*dy) for ii=-1:1] for jj=-1:1]...)
         di, dj = Tuple(findmax(hs)[2]) .- 2
-        x += di*grd.dx
-        y += dj*grd.dy
+        x += di*dx
+        y += dj*dy
         i += di
         j += dj
         dist += sqrt(di^2 + dj^2)
@@ -38,8 +36,8 @@ function mirror_image(x, y, dx, dy, f::Function)
     while (dist > 0) && (steps > 0)
         hs = hcat([[f(x+ii*dx, y+jj*dy) for ii=-1:1] for jj=-1:1]...)
         di, dj = Tuple(findmax(hs)[2]) .- 2
-        x += di*grd.dx
-        y += dj*grd.dy
+        x += di*dx
+        y += dj*dy
         i += di
         j += dj
         dist -= sqrt(di^2 + dj^2)
@@ -118,7 +116,7 @@ end
 
 function smoothstep(x, y, s0, ds, ms::MirrorSegments)
 
-    u = (distance_to_mirror(x, y, ms) - s0) / ds
+    u = (distance_to_mirror(x, y, ms)[1] - s0) / ds
     return (u < 0) ? 0.0 : ((0 < u < 1) ? 3*u^2 - 2*u^3 : 1.0)
 end
 
@@ -185,7 +183,7 @@ function GhostData(ms::MirrorSegments, grd::Grid)
     mirr_j = M[2,:]
     flip_factors = M[3:end,:]
 
-    Mirror = sparse([1:grd.Nk...], img_j, ones(grd.Nk), grd.Nk, grd._Nx*grd._Ny) * transpose(grd.Proj)
+    Mirror = sparse([1:grd.Nk...], mirr_j, ones(grd.Nk), grd.Nk, grd._Nx*grd._Ny) * transpose(grd.Proj)
     Proj = sparse([1:length(proj_j)...], proj_j, ones(length(proj_j)), length(proj_j), grd.Nk)
 
     return GhostData(Proj, Mirror, flip_factors)

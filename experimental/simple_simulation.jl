@@ -89,7 +89,7 @@ function load_ghost_data(fid, name::String)
 end
 
 
-function solovev_vertices(N1, N2, N3)
+function boundary_setup(bdry_path::String, N1, N2, N3)
 
     count = 0
 
@@ -105,7 +105,7 @@ function solovev_vertices(N1, N2, N3)
     # find where the inner flux surface intersects y=0 on the outboard side
     bracket1 = [1.0, 0.0]
     bracket2 = [2.0, 0.0]
-    r0 = regula_falsi(r->psi(r...), psi_in, bracket1, bracket2)
+    r0 = rootfind_bisection(r->psi(r...), psi_in, bracket1, bracket2)
 
     # resolve inner boundary
     inner_chain_1, _ = trace_fieldline(r0, bp, r->psi(r...), 0.001) do r
@@ -124,7 +124,7 @@ function solovev_vertices(N1, N2, N3)
     # find where outer flux surface intersects right diverter plate
     bracket1 = [1.0, -(0.561 + 0.04)]
     bracket2 = [2.0, -(0.561 + 0.04)]
-    r0 = regula_falsi(r->psi(r...), psi_out, bracket1, bracket2)
+    r0 = rootfind_bisection(r->psi(r...), psi_out, bracket1, bracket2)
 
     # resolve outer flux surface
     outer_chain, _ = trace_fieldline(r0, bp, r->psi(r...), 0.001) do r
@@ -140,7 +140,7 @@ function solovev_vertices(N1, N2, N3)
     # find where outer flux surface intersects left diverter plate, add to outer_chain
     bracket1 = [0.0, -(0.561 + 0.04)]
     bracket2 = [1.0, -(0.561 + 0.04)]
-    rl = regula_falsi(r->psi(r...), psi_out, bracket1, bracket2)
+    rl = rootfind_bisection(r->psi(r...), psi_out, bracket1, bracket2)
     outer_chain = hcat(outer_chain, rl)
 
     div_range_1 = count+1:count+1
@@ -149,7 +149,7 @@ function solovev_vertices(N1, N2, N3)
     # find where private flux surface intersects left diverter plate
     bracket1 = [rl[1], -(0.561 + 0.04)]
     bracket2 = [1.0, -(0.561 + 0.04)]
-    rl = regula_falsi(r->psi(r...), psi_priv, bracket1, bracket2)
+    rl = rootfind_bisection(r->psi(r...), psi_priv, bracket1, bracket2)
 
     # trace private flux surface
     private_chain, _ = trace_fieldline(rl, r->-bp(r), r->psi(r...), 0.001) do r
@@ -166,7 +166,7 @@ function solovev_vertices(N1, N2, N3)
     # find where private flux surface intersects right diverter plate
     bracket1 = [1.0, -(0.561 + 0.04)]
     bracket2 = [2.0, -(0.561 + 0.04)]
-    rr = regula_falsi(r->psi(r...), psi_priv, bracket1, bracket2)
+    rr = rootfind_bisection(r->psi(r...), psi_priv, bracket1, bracket2)
     outer_chain = hcat(outer_chain, rr, outer_chain[:,1])
 
     div_range_2 = count+1:count+1
@@ -191,13 +191,27 @@ function solovev_vertices(N1, N2, N3)
     orientations = ones(Int64, Nv)
     orientations[1:Nin] .= -1
 
-    return MirrorSegments(verts, orientations), inner_boundary, outer_boundary, div_boundary
+    fid = h5open(bdry_path, "w")
+    fid["verts"] = verts[:,:,:]
+    fid["orientations"] = orientations[:]
+    fid["inner_boundary"] = inner_boundary[:]
+    fid["outer_boundary"] = outer_boundary[:]
+    fid["div_boundary"] = div_boundary[:]
+    close(fid)
 end
 
 
-function simple_geometry_setup(path::String, Nx, Ny)
+function simple_geometry_setup(geo_path::String, bdry_path::String, Nx, Ny)
 
-    ms, inner_boundary, outer_boundary, div_boundary = solovev_vertices(40, 40, 40)
+    fid = h5open(bdry_path, "r")
+    verts = fid["verts"][:,:,:]
+    orientations = fid["orientations"][:]
+    inner_boundary = fid["inner_boundary"][:]
+    outer_boundary = fid["outer_boundary"][:]
+    div_boundary = fid["div_boundary"][:]
+    close(fid)
+
+    ms = MirrorSegments(verts, orientations)
 
     grd = Grid(Nx, Ny, 1) do
         inside(x,y) = distance_to_mirror(x, y, ms)[1] > -0.05
@@ -208,13 +222,13 @@ function simple_geometry_setup(path::String, Nx, Ny)
 
     # compute penalization values as step functions
     pen = zeros(grd.Nk, 3)
-    pen[:,1] = f_to_grd(grd) do x,y
+    pen[:,1] = f_to_grid(grd) do x,y
         smoothstep(x, y, 0.02, 0.02, ms[inner_boundary])
     end
-    pen[:,2] = f_to_grd(grd) do x,y
+    pen[:,2] = f_to_grid(grd) do x,y
         smoothstep(x, y, 0.02, 0.02, ms[outer_boundary])
     end
-    pen[:,3] = f_to_grd(grd) do x,y
+    pen[:,3] = f_to_grid(grd) do x,y
         smoothstep(x, y, 0.02, 0.02, ms[div_boundary])
     end
 
@@ -222,14 +236,105 @@ function simple_geometry_setup(path::String, Nx, Ny)
     K1 = sparse(Diagonal(pen[:,1] .* pen[:,2] .* pen[:,3]))
     K2 = 100 * (I - K1)
 
-    gd_nmann = GhotData(ms, grd)
+    gd_nmann = GhostData(ms, grd)
 
-    fid = h5open(path, "w")
+    fid = h5open(geo_path, "w")
     save_grid(fid, grd, "Grid")
     save_sparse_matrix(fid, K1, "K1")
     save_sparse_matrix(fid, K2, "K2")
     save_ghost_data(fid, gd_nmann, "gd")
     close(fid)
+end
+
+
+function simple_physics_setup(w0, psi0, L_w, L_psi, init_path::String, geo_path::String)
+
+    fid = h5open(geo_path, "r")
+    grd = load_grid(fid, "Grid")
+    gd = load_ghost_data(fid, "gd")
+    close(fid)
+
+    psi_func, bx, by, bz = solovev_flux_function(0.1, 0.1, 0.3, 1.7, 10.0, downsep=[1, -0.561])
+    psi_mid = psi_func(0.65, 0)
+    dp_w = abs(ForwardDiff.derivative(u -> psi_func(u,0), 0.65)) * L_w
+    dp_psi = dp_w * L_psi / L_w
+
+    w_vec = f_to_grid(grd) do x,y
+        w0*tanh((psi_func(x,y) - psi_mid) / dp_w)
+    end
+    psi_vec = f_to_grid(grd) do x,y
+        psi0*tanh((psi_func(x,y) - psi_mid) / dp_psi)
+    end
+
+    w = hcat(w_vec, w_vec, w_vec)
+    psi = hcat(psi_vec, psi_vec, psi_vec)
+
+    # compute derivatives
+    Minv = stencil1d(3)
+    Dx = derivative_matrix(1, 0, Minv, Minv, grd) * 0.3
+    Dy = derivative_matrix(0, 1, Minv, Minv, grd) * 0.3
+    Dxx = derivative_matrix(2, 0, Minv, Minv, grd) * (0.3)^2
+    Dyy = derivative_matrix(0, 2, Minv, Minv, grd) * (0.3)^2
+
+    # solve vorticity equation
+    phi = solve_vorticity_eqn(zeros(grd.Nk), w[:,2], Dxx, Dyy, gd)
+
+    fid = h5open(init_path, "w")
+    save_sparse_matrix(fid, Dx, "Dx")
+    save_sparse_matrix(fid, Dy, "Dy")
+    save_sparse_matrix(fid, Dxx, "Dxx")
+    save_sparse_matrix(fid, Dyy, "Dyy")
+    fid["w"] = w[:,:]
+    fid["phi"] = phi[:]
+    fid["psi"] = psi[:,:]
+    close(fid)
+end
+
+
+function simulate(Nt, k_w, k_psi, am, dt, output_path, init_path, geo_path)
+
+    fid = h5open(geo_path, "r")
+    grd = load_grid(fid, "Grid")
+    K1 = load_sparse_matrix(fid, "K1")
+    K2 = load_sparse_matrix(fid, "K2")
+    gd = load_ghost_data(fid, "gd")
+    close(fid)
+
+    fid = h5open(init_path, "r")
+    Dx = load_sparse_matrix(fid, "Dx")
+    Dy = load_sparse_matrix(fid, "Dy")
+    Dxx = load_sparse_matrix(fid, "Dxx")
+    Dyy = load_sparse_matrix(fid, "Dyy")
+    w = fid["w"][:,:]
+    phi = fid["phi"][:]
+    psi = fid["psi"][:,:]
+    close(fid)
+
+    fid = h5open(output_path, "w")
+    save_grid(fid, grd, "Grid")
+    create_dataset(fid, "w", datatype(Float64), dataspace(grd.Nk*grd.Nz,Nt), chunk=(grd.Nk*grd.Nz,1))
+    create_dataset(fid, "phi", datatype(Float64), dataspace(grd.Nk*grd.Nz,Nt), chunk=(grd.Nk*grd.Nz,1))
+    create_dataset(fid, "psi", datatype(Float64), dataspace(grd.Nk*grd.Nz,Nt), chunk=(grd.Nk*grd.Nz,1))
+    fid["w"][:,1] = w[:,2]
+    fid["phi"][:,1] = phi[:]
+    fid["psi"][:,1] = psi[:,2]
+    close(fid)
+
+    Nskip = 1
+    p = Progress(Nskip*(Nt-1), "Running simple model... ")
+    for t=2:Nt
+        for _=1:Nskip
+            leapfrog!(w, psi, phi, Dx, Dxx, Dy, Dyy, K1, K2, gd, dt, am, k_psi, k_w)
+            next!(p)
+        end
+
+        fid = h5open(output_path, "r+")
+        fid["w"][:,t] = w[:,2]
+        fid["phi"][:,t] = phi[:]
+        fid["psi"][:,t] = psi[:,2]
+        close(fid)
+    end
+
 end
 
 
@@ -353,50 +458,3 @@ end
 #     fid["psi"] = psi[:,:]
 #     close(fid)
 # end
-
-
-function simulate(Nt, k_w, k_psi, am, dt, output_path, init_path, geo_path)
-
-    fid = h5open(geo_path, "r")
-    grd = load_grid(fid, "Grid")
-    K1 = load_sparse_matrix(fid, "K1")
-    K2 = load_sparse_matrix(fid, "K2")
-    gc = load_ghost_conditions(fid, "gc")
-    close(fid)
-
-    fid = h5open(init_path, "r")
-    Dx = load_sparse_matrix(fid, "Dx")
-    Dy = load_sparse_matrix(fid, "Dy")
-    Dxx = load_sparse_matrix(fid, "Dxx")
-    Dyy = load_sparse_matrix(fid, "Dyy")
-    w = fid["w"][:,:]
-    phi = fid["phi"][:]
-    psi = fid["psi"][:,:]
-    close(fid)
-
-    fid = h5open(output_path, "w")
-    save_grid(fid, grd, "Grid")
-    create_dataset(fid, "w", datatype(Float64), dataspace(grd.Nk*grd.Nz,Nt), chunk=(grd.Nk*grd.Nz,1))
-    create_dataset(fid, "phi", datatype(Float64), dataspace(grd.Nk*grd.Nz,Nt), chunk=(grd.Nk*grd.Nz,1))
-    create_dataset(fid, "psi", datatype(Float64), dataspace(grd.Nk*grd.Nz,Nt), chunk=(grd.Nk*grd.Nz,1))
-    fid["w"][:,1] = w[:,2]
-    fid["phi"][:,1] = phi[:]
-    fid["psi"][:,1] = psi[:,2]
-    close(fid)
-
-    Nskip = 1
-    p = Progress(Nskip*(Nt-1), "Running simple model... ")
-    for t=2:Nt
-        for _=1:Nskip
-            leapfrog!(w, psi, phi, Dx, Dxx, Dy, Dyy, K1, K2, gc, dt, am, k_psi, k_w)
-            next!(p)
-        end
-
-        fid = h5open(output_path, "r+")
-        fid["w"][:,t] = w[:,2]
-        fid["phi"][:,t] = phi[:]
-        fid["psi"][:,t] = psi[:,2]
-        close(fid)
-    end
-
-end

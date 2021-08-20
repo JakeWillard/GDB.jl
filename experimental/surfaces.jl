@@ -13,7 +13,7 @@ function find_surface(r0, dr, psi, psi0)
 end
 
 
-function regula_falsi(f::Function, val::Float64, bracket1::Vector{Float64}, bracket2::Vector{Float64})
+function rootfind_bisection(f::Function, val::Float64, bracket1::Vector{Float64}, bracket2::Vector{Float64})
 
     a = bracket1[:]
     b = bracket2[:]
@@ -64,7 +64,7 @@ function conservative_step(r::Vector{Float64}, b::Function, psi::Function, ds::F
     en[1:2] = [0 -1; 1 0] * b(rp)[1:2] / norm(b(rp)[1:2])
     bracket1 = rp + ds*en
     bracket2 = rp - ds*en
-    rc = regula_falsi(psi, psi(r), bracket1, bracket2)
+    rc = rootfind_bisection(psi, psi(r), bracket1, bracket2)
 
     # compute with correct displacement
     return rc, norm(rc - r)
