@@ -68,13 +68,30 @@ function load_grid(fid, name::String)
 end
 
 
+function save_mirror(fid, M::Mirror, name::String)
+
+    fid["$(name)/verts"] = M.verts[:,:]
+    fid["$(name)/arms"] = M.arms[:,:,:]
+
+end
+
+
+function load_mirror(fid, name::String)
+
+    verts = fid["$(name)/verts"][:,:]
+    arms = fid["$(name)/arms"][:,:,:]
+
+    return Mirror(verts, arms)
+end
+
+
 function save_ghost_data(fid, gd::GhostData, name::String)
 
     # create group
     create_group(fid, name)
 
     save_sparse_matrix(fid, gd.Proj, "$(name)/Proj")
-    save_sparse_matrix(fid, gd.Mirror, "$(name)/Mirror")
+    save_sparse_matrix(fid, gd.R, "$(name)/R")
     fid["$(name)/flip"] = gd.flip_factors[:,:]
 end
 
@@ -82,10 +99,10 @@ end
 function load_ghost_data(fid, name::String)
 
     Proj = load_sparse_matrix(fid, "$(name)/Proj")
-    Mirror = load_sparse_matrix(fid, "$(name)/Mirror")
+    R = load_sparse_matrix(fid, "$(name)/R")
     flip_factors = fid["$(name)/flip"][:,:]
 
-    return GhostData(Proj, Mirror, flip_factors)
+    return GhostData(Proj, R, flip_factors)
 end
 
 
@@ -108,15 +125,15 @@ function boundary_setup(bdry_path::String, N1, N2, N3)
     r0 = rootfind_bisection(r->psi(r...), psi_in, bracket1, bracket2)
 
     # resolve inner boundary
-    inner_chain_1, _ = trace_fieldline(r0, bp, r->psi(r...), 0.001) do r
+    inner_chain_1, _ = trace_fieldline(r0, bp, r->psi(r...), 0.01) do r
         r[2] < 0
     end
-    inner_chain_2, _ = trace_fieldline(inner_chain_1[:,end], bp, r->psi(r...), 0.001) do r
+    inner_chain_2, _ = trace_fieldline(inner_chain_1[:,end], bp, r->psi(r...), 0.01) do r
         r[2] > 0
     end
     skip = maximum([div(size(inner_chain_1)[2], N1), 1])
-    inner_chain = hcat(inner_chain_1[:,1:skip:end-1], inner_chain_2[:,1:skip:end-1], inner_chain_1[:,1])
-    Nin = size(inner_chain)[2] - 1
+    inner_chain = hcat(inner_chain_1[:,1:skip:end-1], inner_chain_2[:,1:skip:end-1])
+    Nin = size(inner_chain)[2]
 
     inner_range = 1:Nin
     count += Nin
@@ -127,7 +144,7 @@ function boundary_setup(bdry_path::String, N1, N2, N3)
     r0 = rootfind_bisection(r->psi(r...), psi_out, bracket1, bracket2)
 
     # resolve outer flux surface
-    outer_chain, _ = trace_fieldline(r0, bp, r->psi(r...), 0.001) do r
+    outer_chain, _ = trace_fieldline(r0, bp, r->psi(r...), 0.01) do r
         r[2] < -(0.561 + 0.04)
     end
     skip = maximum([div(size(outer_chain)[2], N2), 1])
@@ -152,11 +169,11 @@ function boundary_setup(bdry_path::String, N1, N2, N3)
     rl = rootfind_bisection(r->psi(r...), psi_priv, bracket1, bracket2)
 
     # trace private flux surface
-    private_chain, _ = trace_fieldline(rl, r->-bp(r), r->psi(r...), 0.001) do r
+    private_chain, _ = trace_fieldline(rl, r->-bp(r), r->psi(r...), 0.01) do r
         r[2] < -(0.561 + 0.04)
     end
     skip = maximum([div(size(private_chain)[2], N3), 1])
-    private_chain = private_chain[:,1:skip:end]
+    private_chain = private_chain[:,1:skip:end-1]
     outer_chain = hcat(outer_chain, private_chain)
     Npriv = size(private_chain)[2]
 
@@ -167,7 +184,7 @@ function boundary_setup(bdry_path::String, N1, N2, N3)
     bracket1 = [1.0, -(0.561 + 0.04)]
     bracket2 = [2.0, -(0.561 + 0.04)]
     rr = rootfind_bisection(r->psi(r...), psi_priv, bracket1, bracket2)
-    outer_chain = hcat(outer_chain, rr, outer_chain[:,1])
+    outer_chain = hcat(outer_chain, rr)
 
     div_range_2 = count+1:count+1
     count += 1
@@ -183,17 +200,10 @@ function boundary_setup(bdry_path::String, N1, N2, N3)
     div_boundary[div_range_1] .= true
     div_boundary[div_range_2] .= true
 
-    verts = zeros(2, 2, Nv)
-    verts[:,1,1:Nin] = inner_chain[:,1:Nin]
-    verts[:,2,1:Nin] = inner_chain[:,2:Nin+1]
-    verts[:,1,Nin+1:end] = outer_chain[:,1:end-1]
-    verts[:,2,Nin+1:end] = outer_chain[:,2:end]
-    orientations = ones(Int64, Nv)
-    orientations[1:Nin] .= -1
+    M = Mirror([reverse(inner_chain, dims=2), outer_chain])
 
     fid = h5open(bdry_path, "w")
-    fid["verts"] = verts[:,:,:]
-    fid["orientations"] = orientations[:]
+    save_mirror(fid, M, "Mirror")
     fid["inner_boundary"] = inner_boundary[:]
     fid["outer_boundary"] = outer_boundary[:]
     fid["div_boundary"] = div_boundary[:]
@@ -204,17 +214,14 @@ end
 function simple_geometry_setup(geo_path::String, bdry_path::String, Nx, Ny)
 
     fid = h5open(bdry_path, "r")
-    verts = fid["verts"][:,:,:]
-    orientations = fid["orientations"][:]
+    M = load_mirror(fid, "Mirror")
     inner_boundary = fid["inner_boundary"][:]
     outer_boundary = fid["outer_boundary"][:]
     div_boundary = fid["div_boundary"][:]
     close(fid)
 
-    ms = MirrorSegments(verts, orientations)
-
     grd = Grid(Nx, Ny, 1) do
-        inside(x,y) = distance_to_mirror(x, y, ms)[1] > -0.05
+        inside(x,y) = distance_to_mirror(x, y, M)[1] > -0.05
         r0 = Float64[0.5, -1]
         r1 = Float64[1.5, 1]
         inside, r0, r1
@@ -223,20 +230,20 @@ function simple_geometry_setup(geo_path::String, bdry_path::String, Nx, Ny)
     # compute penalization values as step functions
     pen = zeros(grd.Nk, 3)
     pen[:,1] = f_to_grid(grd) do x,y
-        smoothstep(x, y, 0.02, 0.02, ms[inner_boundary])
+        smoothstep(x, y, 0.02, 0.02, M[inner_boundary])
     end
     pen[:,2] = f_to_grid(grd) do x,y
-        smoothstep(x, y, 0.02, 0.02, ms[outer_boundary])
+        smoothstep(x, y, 0.02, 0.02, M[outer_boundary])
     end
     pen[:,3] = f_to_grid(grd) do x,y
-        smoothstep(x, y, 0.02, 0.02, ms[div_boundary])
+        smoothstep(x, y, 0.02, 0.02, M[div_boundary])
     end
 
     # K1 and K2 are operators for penalized forward-euler timesteps
     K1 = sparse(Diagonal(pen[:,1] .* pen[:,2] .* pen[:,3]))
     K2 = 100 * (I - K1)
 
-    gd_nmann = GhostData(ms, grd)
+    gd_nmann = GhostData(M, grd)
 
     fid = h5open(geo_path, "w")
     save_grid(fid, grd, "Grid")

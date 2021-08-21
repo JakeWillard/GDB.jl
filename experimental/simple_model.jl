@@ -25,7 +25,7 @@ function solve_pde(A, x0, b, gd::GhostData)
     bn = gd.Proj*b
     # x = jacobi_preconditioned_gmres(An, gd.Proj*x0, bn, 1, 1)
     x = An \ bn
-    return gd.Mirror*transpose(gd.Proj)*x
+    return gd.R*transpose(gd.Proj)*x
 end
 
 
