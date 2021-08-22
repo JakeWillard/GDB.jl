@@ -115,8 +115,8 @@ function boundary_setup(bdry_path::String, N1, N2, N3)
     bp(r) = Float64[bx(r...), by(r...)]
 
     # values for flux surfaces
-    psi_in = psi(1 - 0.28, 0)
-    psi_out = psi(1 - 0.34, 0)
+    psi_in = psi(1 + 0.28, 0)
+    psi_out = psi(1 + 0.34, 0)
     psi_priv = psi(1, -(0.561 + 0.01))
 
     # find where the inner flux surface intersects y=0 on the outboard side
@@ -125,10 +125,10 @@ function boundary_setup(bdry_path::String, N1, N2, N3)
     r0 = rootfind_bisection(r->psi(r...), psi_in, bracket1, bracket2)
 
     # resolve inner boundary
-    inner_chain_1, _ = trace_fieldline(r0, bp, r->psi(r...), 0.01) do r
+    inner_chain_1, _ = trace_fieldline(r0, bp, r->psi(r...), 0.001) do r
         r[2] < 0
     end
-    inner_chain_2, _ = trace_fieldline(inner_chain_1[:,end], bp, r->psi(r...), 0.01) do r
+    inner_chain_2, _ = trace_fieldline(inner_chain_1[:,end], bp, r->psi(r...), 0.001) do r
         r[2] > 0
     end
     skip = maximum([div(size(inner_chain_1)[2], N1), 1])
@@ -144,7 +144,7 @@ function boundary_setup(bdry_path::String, N1, N2, N3)
     r0 = rootfind_bisection(r->psi(r...), psi_out, bracket1, bracket2)
 
     # resolve outer flux surface
-    outer_chain, _ = trace_fieldline(r0, bp, r->psi(r...), 0.01) do r
+    outer_chain, _ = trace_fieldline(r0, bp, r->psi(r...), 0.001) do r
         r[2] < -(0.561 + 0.04)
     end
     skip = maximum([div(size(outer_chain)[2], N2), 1])
@@ -169,7 +169,7 @@ function boundary_setup(bdry_path::String, N1, N2, N3)
     rl = rootfind_bisection(r->psi(r...), psi_priv, bracket1, bracket2)
 
     # trace private flux surface
-    private_chain, _ = trace_fieldline(rl, r->-bp(r), r->psi(r...), 0.01) do r
+    private_chain, _ = trace_fieldline(rl, r->-bp(r), r->psi(r...), 0.001) do r
         r[2] < -(0.561 + 0.04)
     end
     skip = maximum([div(size(private_chain)[2], N3), 1])
@@ -262,7 +262,7 @@ function simple_physics_setup(w0, psi0, L_w, L_psi, init_path::String, geo_path:
     close(fid)
 
     psi_func, bx, by, bz = solovev_flux_function(0.1, 0.1, 0.3, 1.7, 10.0, downsep=[1, -0.561])
-    psi_mid = psi_func(0.65, 0)
+    psi_mid = psi_func(0.685, 0)
     dp_w = abs(ForwardDiff.derivative(u -> psi_func(u,0), 0.65)) * L_w
     dp_psi = dp_w * L_psi / L_w
 
