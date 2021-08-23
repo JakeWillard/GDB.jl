@@ -112,16 +112,17 @@ function boundary_setup(bdry_path::String, N1, N2, N3)
 
     # define the magnetic field
     psi, bx, by, bz = solovev_flux_function(0.1, 0.1, 0.3, 1.7, 10.0, downsep=[1, -0.561])
-    bp(r) = Float64[bx(r...), by(r...)]
+    Bp(r) = Float64[bx(r...), by(r...)]
+    bp(r) = Bp(r) / norm(Bp(r))
 
     # values for flux surfaces
     psi_in = psi(1 + 0.28, 0)
     psi_out = psi(1 + 0.34, 0)
     psi_priv = psi(1, -(0.561 + 0.01))
 
-    # find where the inner flux surface intersects y=0 on the outboard side
-    bracket1 = [1.0, 0.0]
-    bracket2 = [2.0, 0.0]
+    # find where the inner flux surface intersects y=0.1 on the outboard side
+    bracket1 = [1.0, 0.1]
+    bracket2 = [2.0, 0.1]
     r0 = rootfind_bisection(r->psi(r...), psi_in, bracket1, bracket2)
 
     # resolve inner boundary
@@ -129,7 +130,7 @@ function boundary_setup(bdry_path::String, N1, N2, N3)
         r[2] < 0
     end
     inner_chain_2, _ = trace_fieldline(inner_chain_1[:,end], bp, r->psi(r...), 0.001) do r
-        r[2] > 0
+        r[2] > 0.1
     end
     skip = maximum([div(size(inner_chain_1)[2], N1), 1])
     inner_chain = hcat(inner_chain_1[:,1:skip:end-1], inner_chain_2[:,1:skip:end-1])
@@ -209,6 +210,113 @@ function boundary_setup(bdry_path::String, N1, N2, N3)
     fid["div_boundary"] = div_boundary[:]
     close(fid)
 end
+
+
+function boundary_no_diverter(bdry_path::String, N1, N2, N3)
+
+    count = 0
+
+    # define the magnetic field
+    psi, bx, by, bz = solovev_flux_function(0.1, 0.0, 0.3, 1.0, 10.0)
+    Bp(r) = Float64[bx(r...), by(r...)]
+    bp(r) = Bp(r) / norm(Bp(r))
+
+    psi_in = psi(1 + 0.28, 0)
+    psi_out = psi(1 + 0.34, 0)
+
+    # find where the inner flux surface intersects y=0.1 on the outboard side
+    bracket1 = [1.0, 0.1]
+    bracket2 = [2.0, 0.1]
+    r0 = rootfind_bisection(r->psi(r...), psi_in, bracket1, bracket2)
+
+    # resolve inner boundary
+    inner_chain_1, _ = trace_fieldline(r0, bp, r->psi(r...), 0.001) do r
+        r[2] < 0
+    end
+    inner_chain_2, _ = trace_fieldline(inner_chain_1[:,end], bp, r->psi(r...), 0.001) do r
+        r[2] > 0.1
+    end
+    skip = maximum([div(size(inner_chain_1)[2], N1), 1])
+    inner_chain = hcat(inner_chain_1[:,1:skip:end-1], inner_chain_2[:,1:skip:end-1])
+    Nin = size(inner_chain)[2]
+
+    inner_range = 1:Nin
+    count += Nin
+
+    # find where the outer flux surface intersects y=0.1 on the outboard side
+    bracket1 = [1.0, 0.1]
+    bracket2 = [2.0, 0.1]
+    r0 = rootfind_bisection(r->psi(r...), psi_out, bracket1, bracket2)
+
+    # resolve outer boundary
+    outer_chain_1, _ = trace_fieldline(r0, bp, r->psi(r...), 0.001) do r
+        r[2] < 0
+    end
+    outer_chain_2, _ = trace_fieldline(outer_chain_1[:,end], bp, r->psi(r...), 0.001) do r
+        r[2] > 0.1
+    end
+    skip = maximum([div(size(outer_chain_1)[2], N2), 1])
+    outer_chain = hcat(outer_chain_1[:,1:skip:end-1], outer_chain_2[:,1:skip:end-1])
+    Nout = size(outer_chain)[2]
+
+    outer_range = count+1:count+Nout
+    count += Nout
+
+    Nv = Nin + Nout
+
+    inner_boundary = fill(false, Nv)
+    inner_boundary[inner_range] .= true
+    outer_boundary = fill(false, Nv)
+    outer_boundary[outer_range] .= true
+
+    M = Mirror([reverse(inner_chain, dims=2), outer_chain])
+
+    fid = h5open(bdry_path, "w")
+    save_mirror(fid, M, "Mirror")
+    fid["inner_boundary"] = inner_boundary[:]
+    fid["outer_boundary"] = outer_boundary[:]
+    close(fid)
+end
+
+
+function geometry_no_divertor(geo_path::String, bdry_path::String, Nx, Ny)
+
+    fid = h5open(bdry_path, "r")
+    M = load_mirror(fid, "Mirror")
+    inner_boundary = fid["inner_boundary"][:]
+    outer_boundary = fid["outer_boundary"][:]
+    close(fid)
+
+    grd = Grid(Nx, Ny, 1) do
+        inside(x,y) = distance_to_mirror(x, y, M)[1] > -0.05
+        r0 = Float64[0.5, -1]
+        r1 = Float64[1.5, 1]
+        inside, r0, r1
+    end
+
+    # compute penalization values as step functions
+    pen = zeros(grd.Nk, 2)
+    pen[:,1] = f_to_grid(grd) do x,y
+        smoothstep(x, y, 0.02, 0.02, M[inner_boundary])
+    end
+    pen[:,2] = f_to_grid(grd) do x,y
+        smoothstep(x, y, 0.02, 0.02, M[outer_boundary])
+    end
+
+    # K1 and K2 are operators for penalized forward-euler timesteps
+    K1 = sparse(Diagonal(pen[:,1] .* pen[:,2]))
+    K2 = 100 * (I - K1)
+
+    gd_nmann = GhostData(M, grd)
+
+    fid = h5open(geo_path, "w")
+    save_grid(fid, grd, "Grid")
+    save_sparse_matrix(fid, K1, "K1")
+    save_sparse_matrix(fid, K2, "K2")
+    save_ghost_data(fid, gd_nmann, "gd")
+    close(fid)
+end
+
 
 
 function simple_geometry_setup(geo_path::String, bdry_path::String, Nx, Ny)
