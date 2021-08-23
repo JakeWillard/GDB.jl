@@ -23,6 +23,9 @@ function solve_pde(A, x0, b, gd::GhostData)
 
     An, _ = require_boundary_conditions(A, gd)
     bn = gd.Proj*b
+
+    bn = transpose(An)*bn
+    An = transpose(An)*An
     # x = jacobi_preconditioned_gmres(An, gd.Proj*x0, bn, 1, 1)
     x = An \ bn
     return gd.R*transpose(gd.Proj)*x
