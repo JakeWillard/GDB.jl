@@ -7,6 +7,7 @@ using Distributed
 using DistributedArrays
 using SharedArrays
 using LinearAlgebra
+using IterativeSolvers
 using SparseArrays
 using HDF5
 using ForwardDiff

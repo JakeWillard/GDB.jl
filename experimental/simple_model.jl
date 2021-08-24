@@ -27,7 +27,10 @@ function solve_pde(A, x0, b, gd::GhostData)
     bn = transpose(An)*bn
     An = transpose(An)*An
     # x = jacobi_preconditioned_gmres(An, gd.Proj*x0, bn, 1, 1)
-    x = An \ bn
+    x = gd.Proj*x0
+
+    gauss_seidel!(x, An, bn; maxiter=10)
+    gmres!(x, An, bn)
     return gd.R*transpose(gd.Proj)*x
 end
 
