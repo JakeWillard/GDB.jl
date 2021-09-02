@@ -22,7 +22,7 @@ function checkerboard_setup(Nx, Ny)
     chain = hcat(chain...)
     M = Mirror([chain])
 
-    grd = Grid([0.0, 0.0], [1.0, 1.0], Nx, Ny, 1) do x,y
+    grd = Grid([1-(1/1.618), 0.0], [1.0, 1.0], Nx, Ny, 1) do x,y
         distance_to_mirror(x, y, M)[1] > -0.1
     end
 
@@ -49,8 +49,8 @@ function checkerboard_plot(h)
         # checkerboard_function(x, y, h)
     end
 
-    p = heatmap(gd.R*fvec, grd, 1, aspect_ratio=:equal, color=:pastel, colorbar=false)
-    plot!(p, chain[1,:], chain[2,:], axis=[], bordercolor="white", linewidth=3, color=:red, legend=false, xlims=(grd.r0[1], grd.r1[1]), ylims=(grd.r0[2], grd.r1[2]))
+    p = heatmap(gd.R*fvec, grd, 1, aspect_ratio=:equal, color=:greys, colorbar=false)
+    plot!(p, chain[1,:], chain[2,:], axis=[], bordercolor="white", linewidth=3, color=:red, size=(1000, 1618), legend=false, xlims=(grd.r0[1], grd.r1[1]), ylims=(grd.r0[2], grd.r1[2]))
     return p
 end
 
@@ -81,9 +81,9 @@ function plot_mirror_transform(N, h)
     xs = xs[:,1:skip:n]
     ys = ys[:,1:skip:n]
 
-    p = plot(chain[1,:], chain[2,:], color=:red, linewidth=3)
-    scatter!(p, grd.points[1,:], grd.points[2,:], color=:blue, markersize=1)
-    plot!(p, xs, ys, color=:black, axis=[], bordercolor="white", arrow=true, linewidth=0.5, aspect_ratio=:equal, legend=false, xlims=(grd.r0[1], grd.r1[1]), ylims=(grd.r0[2], grd.r1[2]))
+    p = plot(chain[1,:], chain[2,:], color=:red, linewidth=3, )
+    scatter!(p, grd.points[1,:], grd.points[2,:], color=:blue, markersize=3, )
+    plot!(p, xs, ys, color=:black, axis=[], markersize=2, bordercolor="white", arrow=true, size=(1000, 1618), linewidth=0.5, aspect_ratio=:equal, legend=false, xlims=(grd.r0[1], grd.r1[1]), ylims=(grd.r0[2], grd.r1[2]))
     return p
 end
 
@@ -108,3 +108,59 @@ function old_code_grid(Nr, Nt)
     scatter!(points[1,:], points[2,:], axis=[], bordercolor="white", legend=false, aspect_ratio=:equal, markersize=2, color=:black)
     return p
 end
+
+
+function new_code_grid(Nx, Ny)
+
+    boundary_setup("./poster_boundary_setup.h5", 40, 40, 40)
+
+    fid = h5open("./poster_boundary_setup.h5", "r")
+    M = load_mirror(fid, "Mirror")
+    inner_boundary = fid["inner_boundary"][:]
+    outer_boundary = fid["outer_boundary"][:]
+    close(fid)
+
+    grd = Grid(Nx, Ny, 1) do
+        inside(x,y) = distance_to_mirror(x, y, M)[1] > -0.05
+        r0 = Float64[0.5, -1]
+        r1 = Float64[1.5, 1]
+        inside, r0, r1
+    end
+
+    c = 0
+    inner = []
+    while true
+        c += 1
+        append!(inner, [M.verts[:,c]])
+        if norm(M.verts[:,c] - M.verts[:,c+1]) > 0.2
+            break
+        end
+    end
+    inner = hcat(inner..., inner[1])
+    outer = hcat(M.verts[:,c+1:end], M.verts[:,c+1])
+
+    p = plot(inner[1,:], inner[2,:])
+    plot!(p, outer[1,:], outer[2,:])
+    scatter!(p, grd.points[1,:], grd.points[2,:], axis=[], bordercolor="white", legend=false, aspect_ratio=:equal, markersize=2, color=:black)
+    return p
+end
+
+
+function setup_advection_diffusion(Nx, Ny)
+
+    boundary_setup("./poster_boundary_setup.h5", 40, 40, 40)
+
+    fid = h5open("./poster_boundary_setup.h5", "r")
+    M = load_mirror(fid, "Mirror")
+    inner_boundary = fid["inner_boundary"][:]
+    outer_boundary = fid["outer_boundary"][:]
+    close(fid)
+
+    grd = Grid(Nx, Ny, 1) do
+        inside(x,y) = distance_to_mirror(x, y, M)[1] > -0.05
+        r0 = Float64[0.5, -1]
+        r1 = Float64[1.5, 1]
+        inside, r0, r1
+    end
+
+    gd = GhostData(M, grd)
