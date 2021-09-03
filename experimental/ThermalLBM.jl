@@ -39,23 +39,23 @@ function thermal_lattice_boltzmann_method(grid::Grid, f, g, p, N, tau, tauc, del
     end
 
     u = zeros((xres*yres, 9))
-    for i=1:xres
+    for i=1:xres*yres
         for k=1:9
-            u[i,k] = fnew[i,k]./rho[i]
+            u[i,k] = fnew[i,k] ./ rho[i]
             # u[i,j,k] = c*fnew[i,j,k]/rho[i,j]
         end
     end
     
     Minvx = stencil1d(5)
     Minvy = stencil1d(5)
-    spDx = derivative_matrix(1, 0, Minvx, Minvy, grid)
-    spDy = derivative_matrix(0, 1, Minvx, Minvy, grid)
-    spDxx = derivative_matrix(2, 0, Minvx, Minvy, grid)
-    spDyy = derivative_matrix(0, 2, Minvx, Minvy, grid)
-    Dx = Matrix(spDx)
+    Dx = derivative_matrix(1, 0, Minvx, Minvy, grid)
+    Dy = derivative_matrix(0, 1, Minvx, Minvy, grid)
+    Dxx = derivative_matrix(2, 0, Minvx, Minvy, grid)
+    Dyy = derivative_matrix(0, 2, Minvx, Minvy, grid)
+    """Dx = Matrix(spDx)
     Dy = Matrix(spDy)
     Dxx = Matrix(spDxx)
-    Dyy = Matrix(spDyy)
+    Dyy = Matrix(spDyy)"""
     # derivative matrices are operators that act on other matrices
 
     ptransform = zeros(xres*yres)
@@ -149,10 +149,14 @@ function thermal_lattice_boltzmann_method(grid::Grid, f, g, p, N, tau, tauc, del
 
     fn = zeros(xres, yres, 9)
     gn = zeros(xres, yres, 9)
+    ex = zeros(xres, yres, 9)
+    ex1 = zeros(xres, yres)
     for j=1:yres
         for i=1:xres
             fn[i,j,:] = fnext[(j-1)*xres+i,:]
             gn[i,j,:] = gnext[(j-1)*xres+i,:]
+            ex[i,j,:] = q[(j-1)*xres+i,:]
+            ex1[i,j] = rho[(j-1)*xres+i]
         end
     end
     
@@ -161,14 +165,14 @@ function thermal_lattice_boltzmann_method(grid::Grid, f, g, p, N, tau, tauc, del
     if count < N
         thermal_lattice_boltzmann_method(grid, fn, gn, p, N, tau, tauc, deltax, deltat, count)
     else
-        return fn, gn
+        return fn, gn, ex, ex1
     end
 end
 
-N = 10
+N = 1
 tau = 1000
 tauc = 1000
-deltax = 1000
+deltax = 1
 deltat = 1
 
 grd = Grid(100, 100, 1; Nbuffer=0) do 
@@ -192,7 +196,7 @@ for i=1:xres
     for j=1:yres
         p[i,j] = sin(i*pi/xres)*sin(j*pi/yres)
         for k=1:9
-            fsine[i,j,k] = sin(i*pi/xres)*sin(j*pi/yres)
+            fsine[i,j,k] = sin(i*pi/(xres))*sin(j*pi/(yres))
         end
         rhoinit[i,j] = sum(fsine[i,j,:])
         uinit[i,j,:] = fsine[i,j,:] ./ rhoinit[i,j]
@@ -201,21 +205,28 @@ for i=1:xres
         end
     end
 end
+# heatmap(fsine)
 
 anim = @animate for i=1:N
-    fsine, gsine = thermal_lattice_boltzmann_method(grd, fsine, gsine, p, 1, tau, tauc, deltax, deltat)
+    fsine, gsine, ex, ex1 = thermal_lattice_boltzmann_method(grd, fsine, gsine, p, 1, tau, tauc, deltax, deltat)
     fplot = zeros(xres, yres)
     gplot = zeros(xres, yres)
+    explot = zeros(xres, yres)
+    exp1 = zeros(xres, yres)
+    ucheck = zeros(xres, yres)
     for i=1:xres
         for j=1:yres
+            exp1[i,j] = ex1[i,j]
             for k=1:9
                 fplot[i,j] = fplot[i,j] + fsine[i,j,k]
                 gplot[i,j] = gplot[i,j] + gsine[i,j,k]
+                explot[i,j] = explot[i,j] + ex[i,j,k]
+                ucheck[i,j] = ucheck[i,j] + ex[i,j,k]/ex1[i,j]
             end
         end
     end
     println(fplot[Int32(xres/2),Int32(yres/2)])
     println(gplot[Int32(xres/2),Int32(yres/2)])
-    heatmap(gplot)
+    heatmap(explot)
 end
 gif(anim, fps=10)
