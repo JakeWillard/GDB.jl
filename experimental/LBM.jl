@@ -243,7 +243,7 @@ for i=1:xres
 end
 """
 
-anim = @animate for i=1:N
+"""anim = @animate for i=1:N
     fsine = lattice_boltzmann_method(xres, yres, fsine, 1, tau, deltax, deltat)
     fplot = zeros(xres, yres)
     for i=1:xres
@@ -257,4 +257,4 @@ anim = @animate for i=1:N
     println(fplot[Int32(xres/2),Int32(yres/2)])
     heatmap(fplot)
 end
-gif(anim, fps=10)
+gif(anim, fps=10)"""
