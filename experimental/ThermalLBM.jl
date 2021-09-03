@@ -185,13 +185,19 @@ yres = grd._Ny
 
 fsine = zeros(xres, yres, 9)
 gsine = zeros(xres, yres, 9)
+rhoinit = zeros(xres, yres)
+uinit = zeros(xres, yres, 9)
 p = zeros(xres, yres)
 for i=1:xres
     for j=1:yres
         p[i,j] = sin(i*pi/xres)*sin(j*pi/yres)
         for k=1:9
             fsine[i,j,k] = sin(i*pi/xres)*sin(j*pi/yres)
-            gsine[i,j,k] = sin(i*pi/xres)*sin(j*pi/yres)
+        end
+        rhoinit[i,j] = sum(fsine[i,j,:])
+        uinit[i,j,:] = fsine[i,j,:] ./ rhoinit[i,j]
+        for k=1:9
+            gsine[i,j,k] = (1 - uinit[i,j,k])^2/2 * fsine[i,j,k]
         end
     end
 end
