@@ -75,7 +75,7 @@ function thermal_lattice_boltzmann_method(grid::Grid, f, g, p, N, tau, tauc, del
         esubk = zeros(xres*yres, 9)
         esubk[:,k] .= 1
         for n=1:9
-            q[:,k] = q[:,k] + 9*((grad[n]*ptransform[:]) ./ rho[:] + nu .* (Dxx*u[:,n]+Dyy*u[:,n])) .* (esubk[:,n]-u[:,n]) + nu .* divu[:] .* (grad[n] * (esubk[:,n]-u[:,n]))
+            q[:,k] = q[:,k] + 9*(-(grad[n]*ptransform[:]) ./ rho[:] + nu .* (Dxx*u[:,n]+Dyy*u[:,n])) .* (esubk[:,n]-u[:,n]) + nu .* divu[:] .* (grad[n] * (esubk[:,n]-u[:,n]))
             for m=1:9
                 q[:,k] = q[:,k] + (esubk[:,m]-u[:,m]).* (grad[m]*u[:,n]) .*(esubk[:,n]-u[:,n])
             end
@@ -83,15 +83,15 @@ function thermal_lattice_boltzmann_method(grid::Grid, f, g, p, N, tau, tauc, del
     end
 
     w = zeros(9)
-    w[1] = 0
-    w[2] = c
-    w[3] = c
-    w[4] = c
-    w[5] = c
-    w[6] = c
-    w[7] = c
-    w[8] = c
-    w[9] = c
+    w[1] = 4/9
+    w[2] = 1/9
+    w[3] = 1/9
+    w[4] = 1/9
+    w[5] = 1/9
+    w[6] = 1/36
+    w[7] = 1/36
+    w[8] = 1/36
+    w[9] = 1/36
 
     s = zeros((xres*yres, 9))
     usquared = zeros((xres*yres))
@@ -100,7 +100,7 @@ function thermal_lattice_boltzmann_method(grid::Grid, f, g, p, N, tau, tauc, del
             usquared[i] = usquared[i] + u[i,k]^2
         end
         for k=1:9
-            s[i,k] = w[k] * (3*u[i,k]/c^2 + 9/2*u[i,k]^2/c^4 - 3/2*usquared[i]/c^2)
+            s[i,k] = w[k] * (3*(c*u[i,k])/c^2 + 9/2*(c*u[i,k])^2/c^3 - 3/2*usquared[i]/c^2)
         end
     end
 
@@ -130,14 +130,14 @@ function thermal_lattice_boltzmann_method(grid::Grid, f, g, p, N, tau, tauc, del
     geq = zeros((xres*yres, 9))
     for i=1:xres*yres
         geq[i,1] = -2/3*rhoepsilon[i] * usquared[i]/c^2
-        geq[i,2] = rhoepsilon[i]/9 * (1.5 + 1.5*u[i,2]/c^2 + 4.5*(u[i,2])^2/c^4 - 1.5*usquared[i]/c^2)
-        geq[i,3] = rhoepsilon[i]/9 * (1.5 + 1.5*u[i,3]/c^2 + 4.5*(u[i,3])^2/c^4 - 1.5*usquared[i]/c^2)
-        geq[i,4] = rhoepsilon[i]/9 * (1.5 + 1.5*u[i,4]/c^2 + 4.5*(u[i,4])^2/c^4 - 1.5*usquared[i]/c^2)
-        geq[i,5] = rhoepsilon[i]/9 * (1.5 + 1.5*u[i,5]/c^2 + 4.5*(u[i,5])^2/c^4 - 1.5*usquared[i]/c^2)
-        geq[i,6] = rhoepsilon[i]/36 * (3 + 6*u[i,6]/c^2 + 4.5*(u[i,6])^2/c^4 - 1.5*usquared[i]/c^2)
-        geq[i,7] = rhoepsilon[i]/36 * (3 + 6*u[i,7]/c^2 + 4.5*(u[i,7])^2/c^4 - 1.5*usquared[i]/c^2)
-        geq[i,8] = rhoepsilon[i]/36 * (3 + 6*u[i,8]/c^2 + 4.5*(u[i,8])^2/c^4 - 1.5*usquared[i]/c^2)
-        geq[i,9] = rhoepsilon[i]/36 * (3 + 6*u[i,9]/c^2 + 4.5*(u[i,9])^2/c^4 - 1.5*usquared[i]/c^2)
+        geq[i,2] = rhoepsilon[i]/9 * (1.5 + 1.5*u[i,2]/c + 4.5*(u[i,2])^2/c^2 - 1.5*usquared[i]/c^2)
+        geq[i,3] = rhoepsilon[i]/9 * (1.5 + 1.5*u[i,3]/c + 4.5*(u[i,3])^2/c^2- 1.5*usquared[i]/c^2)
+        geq[i,4] = rhoepsilon[i]/9 * (1.5 + 1.5*u[i,4]/c + 4.5*(u[i,4])^2/c^2 - 1.5*usquared[i]/c^2)
+        geq[i,5] = rhoepsilon[i]/9 * (1.5 + 1.5*u[i,5]/c + 4.5*(u[i,5])^2/c^2 - 1.5*usquared[i]/c^2)
+        geq[i,6] = rhoepsilon[i]/36 * (3 + 6*u[i,6]/c + 4.5*(u[i,6])^2/c^2 - 1.5*usquared[i]/c^2)
+        geq[i,7] = rhoepsilon[i]/36 * (3 + 6*u[i,7]/c + 4.5*(u[i,7])^2/c^2 - 1.5*usquared[i]/c^2)
+        geq[i,8] = rhoepsilon[i]/36 * (3 + 6*u[i,8]/c + 4.5*(u[i,8])^2/c^2 - 1.5*usquared[i]/c^2)
+        geq[i,9] = rhoepsilon[i]/36 * (3 + 6*u[i,9]/c + 4.5*(u[i,9])^2/c^2 - 1.5*usquared[i]/c^2)
     end
 
     gnext = zeros(xres*yres, 9)
@@ -217,6 +217,7 @@ anim = @animate for i=1:N
     for i=1:xres
         for j=1:yres
             exp1[i,j] = ex1[i,j]
+            # explot[i,j] = ex[i,j,1]
             for k=1:9
                 fplot[i,j] = fplot[i,j] + fsine[i,j,k]
                 gplot[i,j] = gplot[i,j] + gsine[i,j,k]
