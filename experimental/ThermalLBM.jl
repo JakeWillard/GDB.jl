@@ -50,10 +50,12 @@ function thermal_lattice_boltzmann_method(xres, yres, f, g, p, N, tau, tauc, del
     # Minvy = stencil1d(5)
     sx = 5
     sy = 5
-    Dx = periodic_derivative(1, 0, sx, sy, xres, yres, .2, .2)
-    Dy = periodic_derivative(0, 1, sx, sy, xres, yres, .2, .2)
-    Dxx = periodic_derivative(2, 0, sx, sy, xres, yres, .2, .2)
-    Dyy = periodic_derivative(0, 2, sx, sy, xres, yres, .2, .2)
+    dx = 100
+    dy = 100
+    Dx = periodic_derivative(1, 0, sx, sy, xres, yres, dx, dy)
+    Dy = periodic_derivative(0, 1, sx, sy, xres, yres, dx, dy)
+    Dxx = periodic_derivative(2, 0, sx, sy, xres, yres, dx, dy)
+    Dyy = periodic_derivative(0, 2, sx, sy, xres, yres, dx, dy)
     """Dx = Matrix(spDx)
     Dy = Matrix(spDy)
     Dxx = Matrix(spDxx)
@@ -175,7 +177,7 @@ N = 1
 tau = 1000
 tauc = 1000
 deltax = 1
-deltat = .1
+deltat = 1
 
 grd = Grid(100, 100, 1; Nbuffer=0) do 
 
@@ -199,9 +201,9 @@ uinit = zeros(xres, yres, 9)
 p = zeros(xres, yres)
 for i=1:xres
     for j=1:yres
-        p[i,j] = sin(i*pi/(xres+1))*sin(j*pi/(yres+1))
+        p[i,j] = sin(i*2*pi/(xres))*sin(j*2*pi/(yres))
         for k=1:9
-            fsine[i,j,k] = .1 + sin(i*pi/(xres+1))*sin(j*pi/(yres+1))
+            fsine[i,j,k] = .1 + sin(i*2*pi/(xres))*sin(j*2*pi/(yres))
         end
         rhoinit[i,j] = sum(fsine[i,j,:])
         uinit[i,j,:] = fsine[i,j,:] ./ rhoinit[i,j]
@@ -235,4 +237,4 @@ anim = @animate for i=1:N
     println(gplot[Int32(xres/2),Int32(yres/2)])
     heatmap(explot)
 end
-gif(anim, fps=5)
+gif(anim, fps=10)
