@@ -50,8 +50,8 @@ function thermal_lattice_boltzmann_method(xres, yres, f, g, p, N, tau, tauc, del
     # Minvy = stencil1d(5)
     sx = 5
     sy = 5
-    dx = 100
-    dy = 100
+    dx = 1
+    dy = 1
     Dx = periodic_derivative(1, 0, sx, sy, xres, yres, dx, dy)
     Dy = periodic_derivative(0, 1, sx, sy, xres, yres, dx, dy)
     Dxx = periodic_derivative(2, 0, sx, sy, xres, yres, dx, dy)
@@ -82,7 +82,17 @@ function thermal_lattice_boltzmann_method(xres, yres, f, g, p, N, tau, tauc, del
     laplu = zeros(xres*yres, 2)
     laplu[:,1] = (Dxx+Dyy)*u[:,1]
     laplu[:,2] = (Dxx+Dyy)*u[:,2]
-    
+
+    # unitvecs = [[0,0] [c,0] [0,c] [-c,0] [0,-c] 1/sqrt(2)*[c,c] 1/sqrt(2)*[-c,c] 1/sqrt(2)*[-c,-c] 1/sqrt(2)*[c,-c]]
+    unitvecs = zeros(9,2)
+    unitvecs[:,1] = [0, c, 0, -c, 0, 1/sqrt(2)*c, -1/sqrt(2)*c, -1/sqrt(2)*c, 1/sqrt(2)*c]
+    unitvecs[:,2] = [0, 0, c, 0, -c, 1/sqrt(2)*c, 1/sqrt(2)*c, -1/sqrt(2)*c, -1/sqrt(2)*c]
+
+    vgradu = zeros(xres*yres, 9, 2)
+    for k=1:9
+        vgradu[:,k,1] = (unitvecs[k,1] .- u[:,1]) .* (Dx*u[:,1]) + (unitvecs[k,2] .- u[:,2]) .* (Dy*u[:,1])
+        vgradu[:,k,2] = (unitvecs[k,1] .- u[:,1]) .* (Dx*u[:,2]) + (unitvecs[k,2] .- u[:,2]) .* (Dy*u[:,2])
+    end
     
 
     # .* for element wise multiplication, similar for division
@@ -97,18 +107,13 @@ function thermal_lattice_boltzmann_method(xres, yres, f, g, p, N, tau, tauc, del
         end
     end"""
 
-    # unitvecs = [[0,0] [c,0] [0,c] [-c,0] [0,-c] 1/sqrt(2)*[c,c] 1/sqrt(2)*[-c,c] 1/sqrt(2)*[-c,-c] 1/sqrt(2)*[c,-c]]
-    unitvecs = zeros(9,2)
-    unitvecs[:,1] = [0, c, 0, -c, 0, 1/sqrt(2)*c, -1/sqrt(2)*c, -1/sqrt(2)*c, 1/sqrt(2)*c]
-    unitvecs[:,2] = [0, 0, c, 0, -c, 1/sqrt(2)*c, 1/sqrt(2)*c, -1/sqrt(2)*c, -1/sqrt(2)*c]
 
-
-    println(unitvecs[2])
+    
     for i=1:xres*yres
         for a=1:9
-            q[i,a] = - 1/rho[i]*dot(gradp[i,:], unitvecs[a,:]-u[i,:]) 
-            + nu*(dot(laplu[i,:], unitvecs[a,:]-u[i,:]) + divu*dot([Dx,Dy], unitvecs[a,:]-u[i,:]))
-            + dot(unitvecs[a,:]-u[i,:], [Dx,Dy])*dot(u[i,:], unitvecs[a,:]-u[i,:])
+            q[i,a] = - 1/rho[i]*dot(unitvecs[a,:]-u[i,:], gradp[i,:]) 
+            + nu*(dot(unitvecs[a,:]-u[i,:], laplu[i,:]))
+            + dot(unitvecs[a,:]-u[i,:], vgradu[i,a,:])
         end
     end
 
@@ -130,7 +135,7 @@ function thermal_lattice_boltzmann_method(xres, yres, f, g, p, N, tau, tauc, del
             usquared[i] = dot(u[i,:],u[i,:])
         end
         for k=1:9
-            s[i,k] = w[k] * (3*dot(unitvecs[k],u[i,:])/c^2 + 9/2*(dot(unitvecs[k],u[i,:]))^2/c^3 - 3/2*usquared[i]/c^2)
+            s[i,k] = w[k] * (3*dot(unitvecs[k,:],u[i,:])/c^2 + 9/2*(dot(unitvecs[k,:],u[i,:]))^2/c^3 - 3/2*usquared[i]/c^2)
         end
     end
 
@@ -160,14 +165,14 @@ function thermal_lattice_boltzmann_method(xres, yres, f, g, p, N, tau, tauc, del
     geq = zeros((xres*yres, 9))
     for i=1:xres*yres
         geq[i,1] = -2/3*rhoepsilon[i] * usquared[i]/c^2
-        geq[i,2] = rhoepsilon[i]/9 * (1.5 + 1.5*dot(unitvecs[2],u[i,:])/c + 4.5*(dot(unitvecs[2],u[i,:]))^2/c^2 - 1.5*usquared[i]/c^2)
-        geq[i,3] = rhoepsilon[i]/9 * (1.5 + 1.5*dot(unitvecs[3],u[i,:])/c + 4.5*(dot(unitvecs[3],u[i,:]))^2/c^2 - 1.5*usquared[i]/c^2)
-        geq[i,4] = rhoepsilon[i]/9 * (1.5 + 1.5*dot(unitvecs[4],u[i,:])/c + 4.5*(dot(unitvecs[4],u[i,:]))^2/c^2 - 1.5*usquared[i]/c^2)
-        geq[i,5] = rhoepsilon[i]/9 * (1.5 + 1.5*dot(unitvecs[5],u[i,:])/c + 4.5*(dot(unitvecs[5],u[i,:]))^2/c^2 - 1.5*usquared[i]/c^2)
-        geq[i,6] = rhoepsilon[i]/36 * (3 + 6*dot(unitvecs[6],u[i,:])/c + 4.5*(dot(unitvecs[6],u[i,:]))^2/c^2 - 1.5*usquared[i]/c^2)
-        geq[i,7] = rhoepsilon[i]/36 * (3 + 6*dot(unitvecs[7],u[i,:])/c + 4.5*(dot(unitvecs[7],u[i,:]))^2/c^2 - 1.5*usquared[i]/c^2)
-        geq[i,8] = rhoepsilon[i]/36 * (3 + 6*dot(unitvecs[8],u[i,:])/c + 4.5*(dot(unitvecs[8],u[i,:]))^2/c^2 - 1.5*usquared[i]/c^2)
-        geq[i,9] = rhoepsilon[i]/36 * (3 + 6*dot(unitvecs[9],u[i,:])/c + 4.5*(dot(unitvecs[9],u[i,:]))^2/c^2 - 1.5*usquared[i]/c^2)
+        geq[i,2] = rhoepsilon[i]/9 * (1.5 + 1.5*dot(unitvecs[2,:],u[i,:])/c^2 + 4.5*(dot(unitvecs[2,:],u[i,:]))^2/c^4 - 1.5*usquared[i]/c^2)
+        geq[i,3] = rhoepsilon[i]/9 * (1.5 + 1.5*dot(unitvecs[3,:],u[i,:])/c^2 + 4.5*(dot(unitvecs[3,:],u[i,:]))^2/c^4 - 1.5*usquared[i]/c^2)
+        geq[i,4] = rhoepsilon[i]/9 * (1.5 + 1.5*dot(unitvecs[4,:],u[i,:])/c^2 + 4.5*(dot(unitvecs[4,:],u[i,:]))^2/c^4 - 1.5*usquared[i]/c^2)
+        geq[i,5] = rhoepsilon[i]/9 * (1.5 + 1.5*dot(unitvecs[5,:],u[i,:])/c^2 + 4.5*(dot(unitvecs[5,:],u[i,:]))^2/c^4 - 1.5*usquared[i]/c^2)
+        geq[i,6] = rhoepsilon[i]/36 * (3 + 6*dot(unitvecs[6,:],u[i,:])/c^2 + 4.5*(dot(unitvecs[6,:],u[i,:]))^2/c^4 - 1.5*usquared[i]/c^2)
+        geq[i,7] = rhoepsilon[i]/36 * (3 + 6*dot(unitvecs[7,:],u[i,:])/c^2 + 4.5*(dot(unitvecs[7,:],u[i,:]))^2/c^4 - 1.5*usquared[i]/c^2)
+        geq[i,8] = rhoepsilon[i]/36 * (3 + 6*dot(unitvecs[8,:],u[i,:])/c^2 + 4.5*(dot(unitvecs[8,:],u[i,:]))^2/c^4 - 1.5*usquared[i]/c^2)
+        geq[i,9] = rhoepsilon[i]/36 * (3 + 6*dot(unitvecs[9,:],u[i,:])/c^2 + 4.5*(dot(unitvecs[9,:],u[i,:]))^2/c^4 - 1.5*usquared[i]/c^2)
     end
 
     gnext = zeros(xres*yres, 9)
@@ -181,12 +186,14 @@ function thermal_lattice_boltzmann_method(xres, yres, f, g, p, N, tau, tauc, del
     gn = zeros(xres, yres, 9)
     ex = zeros(xres, yres, 9)
     ex1 = zeros(xres, yres)
+    ex2 = zeros(xres, yres, 2)
     for j=1:yres
         for i=1:xres
             fn[i,j,:] = fnext[(j-1)*xres+i,:]
             gn[i,j,:] = gnext[(j-1)*xres+i,:]
-            ex[i,j,:] = q[(j-1)*xres+i,:]
+            ex[i,j,:] = geq[(j-1)*xres+i,:]
             ex1[i,j] = rho[(j-1)*xres+i]
+            ex2[i,j,:] = u[(j-1)*xres+i,:]
         end
     end
     
@@ -195,11 +202,11 @@ function thermal_lattice_boltzmann_method(xres, yres, f, g, p, N, tau, tauc, del
     if count < N
         thermal_lattice_boltzmann_method(xres, yres, fn, gn, p, N, tau, tauc, deltax, deltat, count)
     else
-        return fn, gn, ex, ex1
+        return fn, gn, ex, ex1, ex2
     end
 end
 
-N = 1
+N = 100
 tau = 1000
 tauc = 1000
 deltax = 1
@@ -229,7 +236,7 @@ for i=1:xres
     for j=1:yres
         p[i,j] = sin(i*2*pi/(xres))*sin(j*2*pi/(yres))
         for k=1:9
-            fsine[i,j,k] = .1 + sin(i*2*pi/(xres))*sin(j*2*pi/(yres))
+            fsine[i,j,k] = .5 + .5*sin(i*2*pi/(xres))*sin(j*2*pi/(yres))
         end
         rhoinit[i,j] = sum(fsine[i,j,:])
         uinit[i,j,:] = fsine[i,j,:] ./ rhoinit[i,j]
@@ -241,16 +248,18 @@ end
 # heatmap(gsine)
 
 anim = @animate for i=1:N
-    fsine, gsine, ex, ex1 = thermal_lattice_boltzmann_method(xres, yres, fsine, gsine, p, 1, tau, tauc, deltax, deltat)
+    fsine, gsine, ex, ex1, ex2 = thermal_lattice_boltzmann_method(xres, yres, fsine, gsine, p, 1, tau, tauc, deltax, deltat)
     fplot = zeros(xres, yres)
     gplot = zeros(xres, yres)
     explot = zeros(xres, yres)
     exp1 = zeros(xres, yres)
+    exp2 = zeros(xres, yres)
     ucheck = zeros(xres, yres)
     for i=1:xres
         for j=1:yres
             exp1[i,j] = ex1[i,j]
             # explot[i,j] = ex[i,j,1]
+            exp2[i,j] = ex2[i,j,1]
             for k=1:9
                 fplot[i,j] = fplot[i,j] + fsine[i,j,k]
                 gplot[i,j] = gplot[i,j] + gsine[i,j,k]
