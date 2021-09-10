@@ -1,28 +1,84 @@
 
+function rgbs(A, x0, b, Nchunk, Npar)
 
-function block_jacobi_preconditioner!(A::SparseMatrixCSC, x::Vector{Float64}, b::Vector{Float64}, N::Int64, slices...)
+    Nk = length(x0)
+    chunksize = div(Nk, Nchunk)
+    slc = collect(Iterators.partition(1:Nk, chunksize))
+    matlist = [qr(A[:,s]) for s in slc]
+
+    x = x0[:]
+    r = b - A*x
+    for _=1:100
+        parts = shuffle(1:length(matlist))[1:Npar]
+        deltas = pmap(parts) do i
+            matlist[i] \ r
+        end
+
+        for i=1:Npar
+            rng = slc[parts[i]]
+            x[rng] = x[rng] + deltas[i]
+        end
+        r[:] = b - A*x
+
+        @info norm(r) / norm(b)
+    end
+
+    return x
+end
+
+
+function random_row_preconditioner!(A::SparseMatrixCSC, x::Vector{Float64}, b::Vector{Float64}, Niter::Int64, Npar::Int64, slc::Vector{UnitRange{Int64}})
+
+    factorized = [qr(A[:,s]) for s in slc]
+    Nslc = length(slc)
+    r = b - A*x
+
+    for _=1:Niter
+        partitions = shuffle(1:Nslc)[1:Npar]
+
+        deltas = pmap(partitions) do i
+            factorized[i] \ r
+        end
+
+        for j=1:Npar
+            i = partitions[j]
+            rng = slc[i]
+            x[rng] = x[rng] + deltas[j]
+        end
+
+        r[:] = b - A*x
+    end
+end
+
+
+
+
+
+
+function block_jacobi_preconditioner!(A::SparseMatrixCSC, x::Vector{Float64}, b::Vector{Float64}, Nout::Int64, Nin::Int64, slices...)
 
     Nk = length(x)
     Nfac = length(slices)
     r = b - A*x
     factorized = [[qr(A[:,s]) for s in slc] for slc in slices]
+    Adiag = diag(A)
 
-    for _=1:N
+    for _=1:Nout
 
-        d = zeros(Nk)
-        for qrlist in factorized
-            d_slc = pmap(qrlist) do M
-                M \ r
-            end
-            d += vcat(d_slc...) / Nfac
-        end
+        # d = zeros(Nk)
+        # for qrlist in factorized
+        #     d_slc = pmap(qrlist) do M
+        #         M \ r
+        #     end
+        #     d += vcat(d_slc...) / Nfac
+        # end
+        #
+        # x[:] = x + vcat(d)
+        # r[:] = b - A*x
 
-        x[:] = x + vcat(d)
-        r[:] = b - A*x
-
-        # do some richardson iteration?
-        for _=1:10
-            x[:] = x + (2/3)*r
+        # do pure jacobi smoothing
+        for _=1:Nin
+            x[:] = x + r ./ Adiag
             r[:] = b - A*x
         end
     end
@@ -111,26 +167,23 @@ function pgmres(A::SparseMatrixCSC, x::Vector{Float64}, r::Vector{Float64}, m::I
 end
 
 
-function plinsolve(A::SparseMatrixCSC, x0::Vector{Float64}, b::Vector{Float64}, Nc::Int64; Npc=10, Ng=10)
+function plinsolve(A::SparseMatrixCSC, x0::Vector{Float64}, b::Vector{Float64}, Nc::Int64; Np=10, Npar=5, Ng=10)
 
     Nk = length(x0)
-    chunksize0 = div(Nk, Nc)
-    chunksize1 = div(Nk, Nc-1)
-    slc0 = collect(Iterators.partition(1:Nk, chunksize0))
-    slc1 = collect(Iterators.partition(1:Nk, chunksize1))
+    chunksize = div(Nk, Nc)
+    slc = collect(Iterators.partition(1:Nk, chunksize))
 
     x = x0[:]
-    block_jacobi_preconditioner!(A, x, b, Npc, slc0, slc0, slc1)
+    random_row_preconditioner!(A, x, b, Np, Npar, slc)
 
     r = b - A*x
-    return r
+    # return r
     bnorm = norm(b)
     err = norm(r) / bnorm
     @info err
 
     while err > 1e-8
-        # x[:] = pgmres(A, x, r, Ng, slc0)
-        x[:] = gmres_cycle(A, x, b, Ng)
+        x[:] = pgmres(A, x, r, Ng, slc)
         r[:] = b - A*x
         err = norm(r) / bnorm
         @info err
