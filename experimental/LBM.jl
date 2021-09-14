@@ -54,17 +54,17 @@ function PeriodicStreamTensor(Nx, Ny)
 end
 
 
-function BounceBackStreamTensor(Nx, Ny)
+function MirrorStreamTensor(Nx, Ny)
 
     Fx = spdiagm(-1 => ones(Nx - 1))
-    Fx[Nx,Nx-1] = -1
+    Fx[1,1] = 1
     Bx = spdiagm(1 => ones(Nx - 1))
-    Bx[1,2] = -1
+    Bx[Nx,Nx] = 1
 
     Fy = spdiagm(-1 => ones(Ny - 1))
-    Fy[Ny,Ny-1] = -1
+    Fy[1,1] = 1
     By = spdiagm(1 => ones(Ny - 1))
-    By[1,2] = -1
+    By[Ny,Ny] = 1
 
     Ix = sparse(I, Nx, Nx)
     Iy = sparse(I, Ny, Ny)

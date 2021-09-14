@@ -11,7 +11,7 @@ include("C:/Users/lucas/OneDrive/Documents/GitHub/GDB.jl/src/domain/interpolatio
 include("C:/Users/lucas/OneDrive/Documents/GitHub/GDB.jl/experimental/LBM.jl")
 include("C:/Users/lucas/OneDrive/Documents/GitHub/GDB.jl/experimental/periodic_derivatives.jl")
 
-function thermal_lattice_boltzmann_method(xres, yres, f, g, p, N, tau, tauc, deltax, deltat, count=0)
+function thermal_lattice_boltzmann_method(streamtensor, Dx, Dy, Dxx, Dyy, xres, yres, f, g, tau, tauc, deltax, deltat)
     # vector at each point with nine dimensions corresponding to each direction 0-8
     c = deltax/deltat
     nu = tau*c^2/3
@@ -27,15 +27,20 @@ function thermal_lattice_boltzmann_method(xres, yres, f, g, p, N, tau, tauc, del
         end
     end
     
-    stensor = PeriodicStreamTensor(xres, yres)
-    fnew = stensor * ftransform
-    gnew = stensor * gtransform
+    
+    fnew = streamtensor * ftransform
+    gnew = streamtensor * gtransform
     # println(size(ftransform))
 
 
     rho = zeros((xres*yres))
     for i=1:xres*yres
         rho[i] = sum(fnew[i,:])
+    end
+
+    p = zeros(xres*yres)
+    for i=1:xres*yres
+        p[i] = c^2/3 * rho[i]
     end
 
     u = zeros(xres*yres, 2)
@@ -46,28 +51,7 @@ function thermal_lattice_boltzmann_method(xres, yres, f, g, p, N, tau, tauc, del
         u[i,2] = uy
     end
     
-    # Minvx = stencil1d(5)
-    # Minvy = stencil1d(5)
-    sx = 5
-    sy = 5
-    dx = 1
-    dy = 1
-    Dx = periodic_derivative(1, 0, sx, sy, xres, yres, dx, dy)
-    Dy = periodic_derivative(0, 1, sx, sy, xres, yres, dx, dy)
-    Dxx = periodic_derivative(2, 0, sx, sy, xres, yres, dx, dy)
-    Dyy = periodic_derivative(0, 2, sx, sy, xres, yres, dx, dy)
-    """Dx = Matrix(spDx)
-    Dy = Matrix(spDy)
-    Dxx = Matrix(spDxx)
-    Dyy = Matrix(spDyy)"""
     # derivative matrices are operators that act on other matrices
-
-    ptransform = zeros(xres*yres)
-    for j=1:yres
-        for i=1:xres
-            ptransform[(j-1)*xres+i] = p[i,j]
-        end
-    end
     
     q = zeros(xres*yres, 9)
     # divu = zeros(xres*yres)
@@ -77,8 +61,8 @@ function thermal_lattice_boltzmann_method(xres, yres, f, g, p, N, tau, tauc, del
     grad = [Dx, Dy]
     divu = Dx*u[:,1] + Dy*u[:,2]
     gradp = zeros(xres*yres, 2)
-    gradp[:,1] = Dx*ptransform[:] 
-    gradp[:,2] = Dy*ptransform[:]
+    gradp[:,1] = Dx*p[:] 
+    gradp[:,2] = Dy*p[:]
     laplu = zeros(xres*yres, 2)
     laplu[:,1] = (Dxx+Dyy)*u[:,1]
     laplu[:,2] = (Dxx+Dyy)*u[:,2]
@@ -100,7 +84,7 @@ function thermal_lattice_boltzmann_method(xres, yres, f, g, p, N, tau, tauc, del
         esubk = zeros(xres*yres, 9)
         esubk[:,k] .= 1
         for n=1:9
-            q[:,k] = q[:,k] + 9*(-(grad[n]*ptransform[:]) ./ rho[:] + nu .* (Dxx*u[:,n]+Dyy*u[:,n])) .* (esubk[:,n]-u[:,n]) + nu .* divu[:] .* (grad[n] * (esubk[:,n]-u[:,n]))
+            q[:,k] = q[:,k] + 9*(-(grad[n]*p[:]) ./ rho[:] + nu .* (Dxx*u[:,n]+Dyy*u[:,n])) .* (esubk[:,n]-u[:,n]) + nu .* divu[:] .* (grad[n] * (esubk[:,n]-u[:,n]))
             for m=1:9
                 q[:,k] = q[:,k] + (esubk[:,m]-u[:,m]).* (grad[m]*u[:,n]) .*(esubk[:,n]-u[:,n])
             end
@@ -191,22 +175,18 @@ function thermal_lattice_boltzmann_method(xres, yres, f, g, p, N, tau, tauc, del
         for i=1:xres
             fn[i,j,:] = fnext[(j-1)*xres+i,:]
             gn[i,j,:] = gnext[(j-1)*xres+i,:]
-            ex[i,j,:] = geq[(j-1)*xres+i,:]
+            ex[i,j,:] = q[(j-1)*xres+i,:]
             ex1[i,j] = rho[(j-1)*xres+i]
             ex2[i,j,:] = u[(j-1)*xres+i,:]
         end
     end
     
 
-    count = count + 1
-    if count < N
-        thermal_lattice_boltzmann_method(xres, yres, fn, gn, p, N, tau, tauc, deltax, deltat, count)
-    else
-        return fn, gn, ex, ex1, ex2
-    end
+    return fn, gn, ex, ex1, ex2
 end
 
-N = 100
+
+N = 200
 tau = 1000
 tauc = 1000
 deltax = 1
@@ -227,16 +207,32 @@ end
 xres = 100
 yres = 100
 
+stensor = MirrorStreamTensor(xres, yres)
+
+sx = 5
+sy = 5
+dx = 1
+dy = 1
+pDx = periodic_derivative(1, 0, sx, sy, xres, yres, dx, dy)
+pDy = periodic_derivative(0, 1, sx, sy, xres, yres, dx, dy)
+pDxx = periodic_derivative(2, 0, sx, sy, xres, yres, dx, dy)
+pDyy = periodic_derivative(0, 2, sx, sy, xres, yres, dx, dy)
+
+Minvx = stencil1d(sx)
+Minvy = stencil1d(sy)
+Dx = derivative_matrix(1, 0, Minvx, Minvy, grd)
+Dy = derivative_matrix(0, 1, Minvx, Minvy, grd)
+Dxx = derivative_matrix(2, 0, Minvx, Minvy, grd)
+Dyy = derivative_matrix(0, 2, Minvx, Minvy, grd)
+
 fsine = zeros(xres, yres, 9)
 gsine = zeros(xres, yres, 9)
 rhoinit = zeros(xres, yres)
 uinit = zeros(xres, yres, 9)
-p = zeros(xres, yres)
 for i=1:xres
     for j=1:yres
-        p[i,j] = sin(i*2*pi/(xres))*sin(j*2*pi/(yres))
         for k=1:9
-            fsine[i,j,k] = .5 + .5*sin(i*2*pi/(xres))*sin(j*2*pi/(yres))
+            fsine[i,j,k] = .5 + .4*sin(i*2*pi/(xres))*sin(j*2*pi/(yres))
         end
         rhoinit[i,j] = sum(fsine[i,j,:])
         uinit[i,j,:] = fsine[i,j,:] ./ rhoinit[i,j]
@@ -248,7 +244,7 @@ end
 # heatmap(gsine)
 
 anim = @animate for i=1:N
-    fsine, gsine, ex, ex1, ex2 = thermal_lattice_boltzmann_method(xres, yres, fsine, gsine, p, 1, tau, tauc, deltax, deltat)
+    fsine, gsine, ex, ex1, ex2 = thermal_lattice_boltzmann_method(stensor, pDx, pDy, pDxx, pDyy, xres, yres, fsine, gsine, tau, tauc, deltax, deltat)
     fplot = zeros(xres, yres)
     gplot = zeros(xres, yres)
     explot = zeros(xres, yres)
@@ -259,7 +255,7 @@ anim = @animate for i=1:N
         for j=1:yres
             exp1[i,j] = ex1[i,j]
             # explot[i,j] = ex[i,j,1]
-            exp2[i,j] = ex2[i,j,1]
+            exp2[i,j] = ex2[i,j,2]
             for k=1:9
                 fplot[i,j] = fplot[i,j] + fsine[i,j,k]
                 gplot[i,j] = gplot[i,j] + gsine[i,j,k]
@@ -270,6 +266,6 @@ anim = @animate for i=1:N
     end
     println(fplot[Int32(xres/2),Int32(yres/2)])
     println(gplot[Int32(xres/2),Int32(yres/2)])
-    heatmap(explot)
+    heatmap(gplot, clims=(0,8))
 end
 gif(anim, fps=10)
