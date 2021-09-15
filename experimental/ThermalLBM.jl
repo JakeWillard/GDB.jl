@@ -17,19 +17,10 @@ function thermal_lattice_boltzmann_method(streamtensor, Dx, Dy, Dxx, Dyy, xres, 
     nu = tau*c^2/3
     # xres = grid._Nx
     # yres = grid._Ny
-
-    ftransform = zeros(xres*yres, 9)
-    gtransform = zeros(xres*yres, 9)
-    for j=1:yres
-        for i=1:xres
-            ftransform[(j-1)*xres+i,:] = f[i,j,:]
-            gtransform[(j-1)*xres+i,:] = g[i,j,:]
-        end
-    end
     
     
-    fnew = streamtensor * ftransform
-    gnew = streamtensor * gtransform
+    fnew = streamtensor * f
+    gnew = streamtensor * g
     # println(size(ftransform))
 
 
@@ -54,9 +45,6 @@ function thermal_lattice_boltzmann_method(streamtensor, Dx, Dy, Dxx, Dyy, xres, 
     # derivative matrices are operators that act on other matrices
     
     q = zeros(xres*yres, 9)
-    # divu = zeros(xres*yres)
-    # grad = [0, Dx, Dy, -Dx, -Dy, 1/sqrt(2)*(Dx+Dy), 1/sqrt(2)*(-Dx+Dy), 1/sqrt(2)*(-Dx-Dy), 1/sqrt(2)*(Dx-Dy)]
-    # divu = Dx*u[:,2] + Dy*u[:,3] - Dx*u[:,4] - Dy*u[:,5] + 1/sqrt(2).*(Dx*u[:,6]+Dy*u[:,6]) + 1/sqrt(2).*(-Dx*u[:,7]+Dy*u[:,7]) + 1/sqrt(2).*(-Dx*u[:,8]-Dy*u[:,8]) + 1/sqrt(2).*(Dx*u[:,9]-Dy*u[:,9])
 
     grad = [Dx, Dy]
     divu = Dx*u[:,1] + Dy*u[:,2]
@@ -80,19 +68,6 @@ function thermal_lattice_boltzmann_method(streamtensor, Dx, Dy, Dxx, Dyy, xres, 
     
 
     # .* for element wise multiplication, similar for division
-    """for k=1:9
-        esubk = zeros(xres*yres, 9)
-        esubk[:,k] .= 1
-        for n=1:9
-            q[:,k] = q[:,k] + 9*(-(grad[n]*p[:]) ./ rho[:] + nu .* (Dxx*u[:,n]+Dyy*u[:,n])) .* (esubk[:,n]-u[:,n]) + nu .* divu[:] .* (grad[n] * (esubk[:,n]-u[:,n]))
-            for m=1:9
-                q[:,k] = q[:,k] + (esubk[:,m]-u[:,m]).* (grad[m]*u[:,n]) .*(esubk[:,n]-u[:,n])
-            end
-        end
-    end"""
-
-
-    
     for i=1:xres*yres
         for a=1:9
             q[i,a] = - 1/rho[i]*dot(unitvecs[a,:]-u[i,:], gradp[i,:]) 
@@ -165,24 +140,9 @@ function thermal_lattice_boltzmann_method(streamtensor, Dx, Dy, Dxx, Dyy, xres, 
             gnext[i,k] = gnew[i,k] - deltat/(tauc + .5*deltat)*(gnew[i,k] - geq[i,k]) - tauc/(tauc + .5*deltat)*fnext[i,k]*q[i,k]*deltat
         end
     end
-
-    fn = zeros(xres, yres, 9)
-    gn = zeros(xres, yres, 9)
-    ex = zeros(xres, yres, 9)
-    ex1 = zeros(xres, yres)
-    ex2 = zeros(xres, yres, 2)
-    for j=1:yres
-        for i=1:xres
-            fn[i,j,:] = fnext[(j-1)*xres+i,:]
-            gn[i,j,:] = gnext[(j-1)*xres+i,:]
-            ex[i,j,:] = q[(j-1)*xres+i,:]
-            ex1[i,j] = rho[(j-1)*xres+i]
-            ex2[i,j,:] = u[(j-1)*xres+i,:]
-        end
-    end
     
 
-    return fn, gn, ex, ex1, ex2
+    return fnext, gnext, q, rho, u
 end
 
 
@@ -241,10 +201,20 @@ for i=1:xres
         end
     end
 end
-# heatmap(gsine)
+
+fs2 = zeros(xres*yres, 9)
+gs2 = zeros(xres*yres, 9)
+
+for j=1:yres
+    for i=1:xres
+        fs2[(j-1)*xres+i,:] = fsine[i,j,:]
+        gs2[(j-1)*xres+i,:] = gsine[i,j,:]
+    end
+end
+
 
 anim = @animate for i=1:N
-    fsine, gsine, ex, ex1, ex2 = thermal_lattice_boltzmann_method(stensor, pDx, pDy, pDxx, pDyy, xres, yres, fsine, gsine, tau, tauc, deltax, deltat)
+    fs2, gs2, ex, ex1, ex2 = thermal_lattice_boltzmann_method(stensor, pDx, pDy, pDxx, pDyy, xres, yres, fs2, gs2, tau, tauc, deltax, deltat)
     fplot = zeros(xres, yres)
     gplot = zeros(xres, yres)
     explot = zeros(xres, yres)
@@ -253,19 +223,19 @@ anim = @animate for i=1:N
     ucheck = zeros(xres, yres)
     for i=1:xres
         for j=1:yres
-            exp1[i,j] = ex1[i,j]
+            exp1[i,j] = ex1[(j-1)*xres+i]
             # explot[i,j] = ex[i,j,1]
-            exp2[i,j] = ex2[i,j,2]
+            exp2[i,j] = ex2[(j-1)*xres+i,2]
             for k=1:9
-                fplot[i,j] = fplot[i,j] + fsine[i,j,k]
-                gplot[i,j] = gplot[i,j] + gsine[i,j,k]
-                explot[i,j] = explot[i,j] + ex[i,j,k]
-                ucheck[i,j] = ucheck[i,j] + ex[i,j,k]/ex1[i,j]
+                fplot[i,j] = fplot[i,j] + fs2[(j-1)*xres+i,k]
+                gplot[i,j] = gplot[i,j] + gs2[(j-1)*xres+i,k]
+                explot[i,j] = explot[i,j] + ex[(j-1)*xres+i,k]
+                ucheck[i,j] = ucheck[i,j] + ex[(j-1)*xres+i,k]/ex1[(j-1)*xres+i]
             end
         end
     end
     println(fplot[Int32(xres/2),Int32(yres/2)])
     println(gplot[Int32(xres/2),Int32(yres/2)])
-    heatmap(gplot, clims=(0,8))
+    heatmap(gplot, clims=(0,5))
 end
 gif(anim, fps=10)
