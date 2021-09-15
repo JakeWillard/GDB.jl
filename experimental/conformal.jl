@@ -44,38 +44,42 @@ function visualize_map(f::Function, L, N)
 end
 
 
-function map_polar(f::Function, r, N)
 
-    ts = LinRange(0, 2*pi, N)
-    zs = r*(cos.(ts) + im*sin.(ts))
-    ws = f.(zs)
 
-    xs = real.(ws)
-    ys = imag.(ws)
-    return xs, ys
+function d_shape_map(z, kappa, alpha)
+
+    out = (1 + kappa)*z/2.0 + (1 - kappa)/(2*z)
+    for j=1:5
+        n = 2*j
+        _a = (-1)^(n-2)*alpha^(n-1) / (factorial(n-1)*2^n)
+        _b = 1 + (alpha/(2*n))*(z + 1/z)
+        _c = (z - 1/z)^n
+        out += _a * _b * _c
+    end
+    out
 end
 
 
-function map_d_shape(kappa, delta, Nr, Nt)
+
+function vis_edge_coords(kappa, delta, Nr, Nt)
 
     alpha = asin(delta)
+    p = plot()
+
     rs = LinRange(1.0, 2.0, Nr)
-    xs = zeros(Nt, Nr)
-    ys = zeros(Nt, Nr)
-    for i=1:Nr
-        xs[:,i], ys[:,i] = map_polar(rs[i], Nt) do z
-            elpart = (1 + kappa)*z/2.0 + (1 - kappa)/(2*z)
-            sumpart = 0
-            for j=1:5
-                n = 2*j
-                _a = (-1)^(n-2)*alpha^(n-1) / (factorial(n-1)*2^n)
-                _b = 1 + (alpha/(2*n))*(z + 1/z)
-                _c = (z - 1/z)^n
-                sumpart += _a * _b * _c
-            end
-            elpart + sumpart
-        end
+    ts = LinRange(0, 2*pi, Nt)
+
+    for r in rs
+        zs = r*exp.(im * ts)
+        ws = [d_shape_map(z, kappa, alpha) for z in zs]
+        plot!(p, real.(ws), imag.(ws), color=:red, legend=false, aspect_ratio=:equal)
     end
 
-    return xs, ys
+    for t in ts
+        zs = rs * exp(im * t)
+        ws = [d_shape_map(z, kappa, alpha) for z in zs]
+        plot!(p, real.(ws), imag.(ws), color=:blue, legend=false, aspect_ratio=:equal)
+    end
+
+    return p
 end
