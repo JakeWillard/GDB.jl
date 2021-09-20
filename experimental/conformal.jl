@@ -46,18 +46,28 @@ end
 
 
 
+# function d_shape_map(z, kappa, alpha)
+#
+#     out = (1 + kappa)*z/2.0 + (1 - kappa)/(2*z)
+#     for j=1:5
+#         n = 2*j
+#         _a = (-1)^(n-2)*alpha^(n-1) / (factorial(n-1)*2^n)
+#         _b = 1 + (alpha/(2*n))*(z + 1/z)
+#         _c = (z - 1/z)^n
+#         out += _a * _b * _c
+#     end
+#     out
+# end
+
+
 function d_shape_map(z, kappa, alpha)
 
-    out = (1 + kappa)*z/2.0 + (1 - kappa)/(2*z)
-    for j=1:5
-        n = 2*j
-        _a = (-1)^(n-2)*alpha^(n-1) / (factorial(n-1)*2^n)
-        _b = 1 + (alpha/(2*n))*(z + 1/z)
-        _c = (z - 1/z)^n
-        out += _a * _b * _c
-    end
-    out
+    _a = 0.5*(z + 1/z)*cosh(alpha*(z - 1/z)/2)
+    _b = 0.5*(z - 1/z)*sinh(alpha*(z - 1/z)/2)
+    _c = kappa*(z - 1/z)/2.0
+    return _a + _b + _c
 end
+
 
 
 
@@ -66,7 +76,7 @@ function vis_edge_coords(kappa, delta, Nr, Nt)
     alpha = asin(delta)
     p = plot()
 
-    rs = LinRange(1.0, 2.0, Nr)
+    rs = LinRange(1.0, 1.5, Nr)
     ts = LinRange(0, 2*pi, Nt)
 
     for r in rs
