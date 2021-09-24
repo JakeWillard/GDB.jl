@@ -8,7 +8,6 @@ struct Grid
     Proj :: SparseMatrixCSC
     dr :: Float64
     Nk :: Int64
-    Nz :: Int64
     _Nx :: Int64
     _Ny :: Int64
     _Nbuffer :: Int64
@@ -16,14 +15,22 @@ struct Grid
 
 end
 
-
-function Grid(is_inside::Function, r0::Vector{Float64}, r1_guess::Vector{Float64}, dr::Float64, Nz::Int64; Nbuffer=100)
+function Grid(M::Mirror, h::Float64, r0::Vector{Float64}, r1::Vector{Float64}, p::Int64)
 
     deltaX = r1_guess[1] - r0[1]
     deltaY = r1_guess[2] - r0[2]
 
-    Nx = div(deltaX, dr)
-    Ny = div(deltaY, dr)
+    if deltaX < deltaY
+        Nx = 2^p
+        dr = deltaX / Nx
+        Ny = div(deltaY, dr)
+    else
+        Ny = 2^p
+        dr = deltaY / Ny
+        Nx = div(deltaX, dr)
+    end
+
+    # recalculate r1
     r1 = r0 + dr*[Nx, Ny]
 
     _Nx = Nx + 2*Nbuffer
@@ -41,7 +48,7 @@ function Grid(is_inside::Function, r0::Vector{Float64}, r1_guess::Vector{Float64
 
             x = r0[1] + (i-1)*dr
             y = r0[2] + (j-1)*dr
-            if is_inside(x, y)
+            if distance_to_mirror(x, y, M)[1] > -h
                 k += 1
                 points[:,k] = [x, y]
                 proj_cols[k] = i + _Nx*(j-1+Nbuffer) + Nbuffer
@@ -52,12 +59,28 @@ function Grid(is_inside::Function, r0::Vector{Float64}, r1_guess::Vector{Float64
     end
 
     Proj = sparse(proj_rows[1:k], proj_cols[1:k], proj_vals[1:k], k, _Nx*_Ny)
-    return Grid(r0, r1, points[:,1:k], Proj, dr, k, Nz, _Nx, _Ny, Nbuffer, _nan_outside_boundaries)
+    return Grid(r0, r1, points[:,1:k], Proj, dr, k _Nx, _Ny, Nbuffer, _nan_outside_boundaries)
 end
 
 
-# constructor for cases where the "do-block" syntax might make the code more readable
-Grid(f::Function, dr, Nz; Nbuffer=100) = Grid(f()..., dr, Nz; Nbuffer=Nbuffer)
+@recipe function f(v::Vector{Float64}, grd::Grid)
+
+    vp_cart = transpose(grd.Proj) * v
+    V = reshape(vp_cart, grd._Nx, grd._Ny)
+    Vplot = transpose(V[grd._Nbuffer+1:grd._Nx-grd._Nbuffer, grd._Nbuffer+1:grd._Ny-grd._Nbuffer] .* grd._nan_outside_boundaries)
+
+    Nx = grd._Nx - 2*grd._Nbuffer
+    Ny = grd._Ny - 2*grd._Nbuffer
+    x = LinRange(grd.r0[1], grd.r1[1], Nx)
+    y = LinRange(grd.r0[2], grd.r1[2], Ny)
+
+    xlims --> (x[1], x[end])
+    ylims --> (y[1], y[end])
+    size --> (1000, 1000)
+    aspect_ratio --> :equal
+
+    x, y, Vplot
+end
 
 
 @recipe function f(v::Vector{Float64}, grd::Grid, z::Int64)
@@ -83,9 +106,7 @@ end
 
 function function_to_grid(f::Function, grd::Grid)
 
-    vec = Float64[f(grd.points[:,k]...) for k=1:grd.Nk]
-
-    return vcat([vec for _=1:grd.Nz]...)
+    return Float64[f(grd.points[:,k]...) for k=1:grd.Nk]
 end
 
 
