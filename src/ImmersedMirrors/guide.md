@@ -63,7 +63,7 @@ A Grid struct is initialized with three pieces of info: (1) a Mirror struct to d
 * r1 -- vector for the top right corner of the bounding box.
 * p -- N=2^p, where N is the number of grid-points along the shortest side of the bounding box. For example, if (r1 - r0)[1] < (r1 - r0)[2], then Nx = 2^p. If (r1 - r0)[1] > (r1 - r0)[2], then Ny = 2^p.
 
-### The points attribute and function_to_grid
+#### The points attribute and function_to_grid
 
 Grids have an attribute called "points", which is of size 2 x Nk, which Nk is the number of grid-points. Each column of points is a position (x,y) inside the domain. We can use Grids to evaluate a function at each of these points and store those variables in a vector. We do this with function_to_grid:
 
@@ -81,7 +81,9 @@ Grids have an attribute called "points", which is of size 2 x Nk, which Nk is th
 
 The above code demonstrates the usage of function_to_grid, while also showing precicely what that function does by constructing the output vector with an explicit loop over grd.points.
 
-### The projection matrix
+#### A Grid's vector space 
+
+####  The projection matrix
 
 Remember that the Grid constructor used input data corresponding to a rectangular grid, with corners at r0 and r1, which has some dimension Nx x Ny. Having a vector of data like f_to_vector computed in the above code, it is sometimes useful to have this in an alternate representation corresponding to the Nx x Ny rectangular grid instead. It is easiest to explain this by explicit example:
 
@@ -112,9 +114,11 @@ Remember that the Grid constructor used input data corresponding to a rectangula
 
 The first part of the code constructs a Grid. The bounding box is a square centered at the origin with side length 2, the lattice length 0.01, and the domain is defined as the unit disk. The second part of the code uses function_to_grid to calculate sin(x)sin(y) at each of the points inside the unit disk. The third part of the code makes a similar calculation, but instead of only storing values at the points contained in the grd.points attribute, each point on the Nx x Ny grid has a corresponding entry in fvec_rec, and points not within the unit disk are assigned a value of zero. These two vectors fvec_non_rec and fvec_rec are related by linear transformation given by the attribute grd.Proj, which is a sparse matrix. The final part of the code asserts this identity, which is that grd.Proj transforms the rectangular representation into the non-rectangular representation, and its transpose is a right-inverse.
 
-### operator_to_grid
+#### operator_to_grid
 
-Linear operators should have some representation on the grid as well. The derivative of sin(x)sin(y), for example, should be approximated by some matrix transformation of f_as_vector defined above. In the case of a rectangular grid, such matrices are very easy to compute. The utility of the projection matrix described in the previous section is that it allows us to compute linear operators for the non-rectangular case using rectangular versions. The vector representation of the non-rectangular grid is basically a subspace of the rectangular grid representation, and so the transformation of linear operators works exactly the same as a change of basis. Given a matrix transformation computed for the rectangular grid (size NxNy x NxNy), the non-rectangular version is simply Proj M Proj^T. The function operator_to_grid helps streamline the calculation of matrix operators:
+We want linear operators to have some representation on the grid as well. This is usually very easy to do if the grid is rectangular, but for the non-rectangular case it's a little harder, e.g. finite difference approximations for grid-points near the boundary of the grid. It would be much easier if we could simply treat the projection matrix defined above as a change of basis transformation, in which case any operator defined on the rectangular grid M could be mapped onto the non-rectangular grid via Proj M Proj^(-1). Such a thing is not exactly possible since Proj is not invertible, but we can get something that is almost as good. Proj^T is an appropriate pseudo-inverse in this case: Proj^T b is the minimal norm solution to Proj x = b, and it does properly map vectors on the non-rectangular grid to the rectangular grid by filling in zeros at every point that isn't listed in grd.points.
+
+Essentially, Proj M Proj^T is the mapping that we want, and the resulting matrix is an equivalent operator as M except that it assumes all quantities are zero on points where distance_to_mirror(x,y,M) < -h. This is the calculation that is carried out by the function operator_to_grid, which is used like this:
 
     Diff_x = operator_to_grid(grd) do
         Dx = spdiagm(1 => ones(grd._Nx-1))
@@ -129,14 +133,7 @@ Linear operators should have some representation on the grid as well. The deriva
 
     fvec_diffx = Diff_x * fvec
 
-The code within the do-block is nothing more than a crude method of calculating a central difference approximation of the first derivative assuming a rectangular grid. It is automatically projected onto the non-rectangular subspace, so that fvec_diffx is an approximation of the partial x derivative of sin(x)sin(y) on the points contained in grd.points.
-
-### Projection errors
-
-The matrix Diff_x computed above has some potential errors associated with it. The first is due to the crudeness of implementation: the code within the do-block is simply not a correct central difference approximation at the edges of the rectangular grid. This is purely user-error, since I could have written every row of the matrix to be computed correctly. However, we can get away with sloppiness of this kind provided that the edges of the rectangular grid are not very near the edges of the actual domain, i.e the bounding box defined by r0 and r1 should be large enough so that these errors are "deleted" by the similarity transform Proj M Proj^T.
-
-The other source of error has to do with the assumptions implicit in the projection itself. Proj is not invertible, rather we are using Proj^T as the appropriate pseudoinverse: Proj^T b is the minimum norm solution of Proj x = b. In the case of operators which couple points inside the domain to points outside the domain, Proj M Proj^T will not give the same result as M in general, as it effectively will perform the transformation under the assumption that everything outside the domain is set to zero. Tools described later in this guide will be useful in properly accounting for this effect when solving boundary value problems.
-
+In this example, we are creating a first derivative matrix using a central differencing approximation. Note that the code within the do-block is nothing more than a crude method of calculating this matrix on the rectangular grid. It is automatically projected onto the non-rectangular subspace, so that fvec_diffx is an approximation of the partial x derivative of sin(x)sin(y) on the points contained in grd.points.
 
 ### GhostData
 
