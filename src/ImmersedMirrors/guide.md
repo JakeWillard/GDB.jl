@@ -160,3 +160,46 @@ Say we want to numerically evolve the Schroedinger equation for a free particle.
 The code following the definition of the laplacian would be all it takes to update the wavefunction by one timestep while satisfying the boundary conditions, provided that forward-Euler method was deemed appropriate.
 
 We can modify this to satisfy inhomogeneous conditions as well. This is done by instead imposing (psi - psi_b) = gd.R*(psi - psi_b), where psi_b is either the boundary value for a Dirichlet condition, or its normal derivative at the boundary is the boundary value for a Neumann condition.
+
+#### Constraining linear systems
+
+Attached to GhostData structs is an attribute called Proj, which is another projection matrix that is similar but distinct from the Proj attached to Grid structs. Here, Proj is a projection from the non-rectangular space to an even smaller subspace defined by the points in grd.points that are not ghost points. From here, I will call the non-rectangular space that includes grid-points as the ghost-inclusive space, and this smaller subspace the ghost-exclusive space.
+
+The purpose of defining yet another projection onto yet another grid-space is clear if we make the following calculation:
+
+    # function returns laplacian on the ghost-inclusive space
+    L = operator_to_grid(grd::Grid) do
+
+        # code in the block creates laplacian on rectangular space
+        Dxx = spdiagm(1 => ones(grd._Nx-1))
+        Dxx += spdiagm(-1 => ones(grd._Nx-1))
+        Dxx += spdiagm(0 => -2*ones(grd._Nx))
+
+        Dyy = spdiagm(1 => ones(grd._Ny-1))
+        Dyy += spdiagm(-1 => ones(grd._Ny-1))
+        Dyy += spdiagm(0 => -2*ones(grd._Ny))
+
+        kron(Dyy, Dxx) / grd.dr^2
+    end
+
+    # one more projection to get laplacian on ghost-exclusive space.
+    L = gd.Proj * L * gd.R * transpose(gd.Proj)
+
+This code calculates a laplacian matrix again, but then carries out another projection of the form Proj L Proj^(-1). However, instead of using Proj^T as the pseudoinverse, now we use R Proj^T. R Proj^T will map vectors on the ghost-exclusive space into the ghost-inclusive space such that the ghost values are extrapolated via the transformation described previously. In this way, L is now a matrix representation of the laplacian that acts on the ghost-exclusive space in a way that automatically imposes homogeneous boundary conditions. This means that we can solve simple PDEs:
+
+    rhs = function_to_grid(grd) do x,y
+        sin(x)*sin(y)
+    end
+    rhs = gd.Proj * rhs
+
+    # solve poisson equation on ghost-exclusive space
+    phi_projected = L \ rhs
+
+    # extrapolate with gd.R to get solution on ghost-inclusive space
+    phi = gd.R * transpose(gd.Proj) * phi_proj
+
+We have just solved the Poisson equation Del^2 phi = sin(x)sin(y) with arbitrary homogeneous boundary conditions defined by the GhostData struct gd.
+
+#### Inhomogeneous generalization
+
+This is easily generalized to the inhomogeneous case. For the ghost value extrapolation, there is a function extrapolate_ghosts which accomplishes this. With a function 
