@@ -44,8 +44,6 @@ The orientation of the chains will be important, so note how the vertices are li
 
     M = Mirror([chain1, chain2])
 
-For brevity, I will from here on refer to counter-clockwise ordering as "positive" orientation and clockwise as "negative" orientation. Positive orientation defines bounded regions, negative orientation defines unbounded regions with a hole.
-
 #### Usage
 
 distance_to_mirror(x, y, M::Mirror) returns a tuple (dist, k) where dist is the shortest distance from the point (x,y) to the mirror struct M, and k is the index corresponding to the nearest vertex. All of the vertices of all of the chains are listed together in the attribute "verts", so this nearest vertex can be referenced with M.verts[:,k]. The returned value dist is a signed distance, and it returns positive for interior points and negative for exterior points.
@@ -79,17 +77,11 @@ Grids have an attribute called "points", which is of size 2 x Nk, which Nk is th
 
     @assert all(f_as_vector .== f_as_vector_alt)
 
-The above code demonstrates the usage of function_to_grid, while also showing precicely what that function does by constructing the output vector with an explicit loop over grd.points.
+The above code demonstrates the usage of function_to_grid, while also showing what that function does by constructing the output vector with an explicit loop over grd.points.
 
-#### A Grid's vector space 
+#### The projection matrix
 
-####  The projection matrix
-
-Remember that the Grid constructor used input data corresponding to a rectangular grid, with corners at r0 and r1, which has some dimension Nx x Ny. Having a vector of data like f_to_vector computed in the above code, it is sometimes useful to have this in an alternate representation corresponding to the Nx x Ny rectangular grid instead. It is easiest to explain this by explicit example:
-
-    grd = Grid([-1.0, -1.0], [1.0, 1.0], 0.01, 1) do x,y
-        norm([x,y]) < 1
-    end
+It is convenient to think of vectors like f_as_vector defined above as living in a vector space associated with the list of points grd.points. So from here on, I will talk about a "grid space" as being that kind of vector space. Remember that the Grid constructor used input data corresponding to a rectangular grid, with corners at r0 and r1, which has some dimension Nx x Ny. This rectangular grid also has a vector space, and it is convenient to be able to define certain things on the rectangular space and then project them onto the non-rectangular space. The Proj attribute is a sparse matrix that does exactly this. The following should make it clear:
 
     fvec_non_rec = function_to_grid(grd::Grid) do x,y
         sin(x)*sin(y)
@@ -100,27 +92,21 @@ Remember that the Grid constructor used input data corresponding to a rectangula
         for i=1:grd._Nx
             x = -1.0 + 0.01*(i-1)
             y = -1.0 + 0.01*(j-1)
-
-            if norm([x,y]) < 1
-                fvec_rec = [fvec_rec; sin(x)*(sin(y))]
-            else
-                fvec_rec = [fvec_rec; 0]
-            end
+            fvec_rec = [fvec_rec; sin(x)*sin(y)]
         end
     end
 
-    @assert all(fvec_non_rec .== grd.Proj*fvec_rec)
-    @assert all(fvec_rec .== transpose(grd.Proj)*fvec_non_rec)
+    @assert all(fvec_non_rec .== grd.Proj * fvec_rec)
 
-The first part of the code constructs a Grid. The bounding box is a square centered at the origin with side length 2, the lattice length 0.01, and the domain is defined as the unit disk. The second part of the code uses function_to_grid to calculate sin(x)sin(y) at each of the points inside the unit disk. The third part of the code makes a similar calculation, but instead of only storing values at the points contained in the grd.points attribute, each point on the Nx x Ny grid has a corresponding entry in fvec_rec, and points not within the unit disk are assigned a value of zero. These two vectors fvec_non_rec and fvec_rec are related by linear transformation given by the attribute grd.Proj, which is a sparse matrix. The final part of the code asserts this identity, which is that grd.Proj transforms the rectangular representation into the non-rectangular representation, and its transpose is a right-inverse.
+Here, rectangular and non-rectangular version of the function sin(x)sin(y) are calculated, and it is asserted that the non-rectangular version can be obtained from the rectangular version by applying the matrix transformation grd.Proj.
 
-#### operator_to_grid
+#### Mapping linear operators
 
-We want linear operators to have some representation on the grid as well. This is usually very easy to do if the grid is rectangular, but for the non-rectangular case it's a little harder, e.g. finite difference approximations for grid-points near the boundary of the grid. It would be much easier if we could simply treat the projection matrix defined above as a change of basis transformation, in which case any operator defined on the rectangular grid M could be mapped onto the non-rectangular grid via Proj M Proj^(-1). Such a thing is not exactly possible since Proj is not invertible, but we can get something that is almost as good. Proj^T is an appropriate pseudo-inverse in this case: Proj^T b is the minimal norm solution to Proj x = b, and it does properly map vectors on the non-rectangular grid to the rectangular grid by filling in zeros at every point that isn't listed in grd.points.
+It is often convenient to define linear operators on the rectangular space and then "translate" that matrix onto the non-rectangular space. This can only be done exactly if the transformation is invertible, and Proj is not generally invertible. However, there is an appropriate pseudoinverse in this case, which is Proj^T. This can be seen as a mapping from the non-rectangular space to the rectangular space assuming that everything is zero at points not contained in grd.points. This is an acceptable assumption to make, provided that the "ghost region" is sufficiently thick. In other words, h/grd.dr must not be too small, where h is the input variable controlling the thickness of the ghost region. If h and the grid resolution are chosen carefully, linear operators defined on the rectangular grid can be mapped onto the non-rectangular grid via Proj M Proj^T, and the resulting matrix will be a faithful representation of the matrix M everywhere inside the domain of interest.
 
-Essentially, Proj M Proj^T is the mapping that we want, and the resulting matrix is an equivalent operator as M except that it assumes all quantities are zero on points where distance_to_mirror(x,y,M) < -h. This is the calculation that is carried out by the function operator_to_grid, which is used like this:
+operator_to_grid is a function that will automatically project a matrix M defined on the rectangular space onto the non-rectangular space using Proj M Proj^T. This is done by defining M within a do-block:
 
-    Diff_x = operator_to_grid(grd) do
+    Diff_x = operator_to_grid(grd::Grid) do
         Dx = spdiagm(1 => ones(grd._Nx-1))
         Dx += spdiagm(-1 => -ones(grd._Nx-1))
         Iy = sparse(I, grd._Ny, grd._Ny)
@@ -133,10 +119,44 @@ Essentially, Proj M Proj^T is the mapping that we want, and the resulting matrix
 
     fvec_diffx = Diff_x * fvec
 
-In this example, we are creating a first derivative matrix using a central differencing approximation. Note that the code within the do-block is nothing more than a crude method of calculating this matrix on the rectangular grid. It is automatically projected onto the non-rectangular subspace, so that fvec_diffx is an approximation of the partial x derivative of sin(x)sin(y) on the points contained in grd.points.
+The matrix Diff_x is just a first derivative matrix calculated using a central difference approximation. Note that the code within the do-block is nothing more than a crude method for computing a central difference matrix on a rectangular grid.
+
 
 ### GhostData
 
 #### Constructor
 
-A GhostData struct exists as a marriage between a Mirror and a Grid, and it is initialized with one of both.
+GhostData structs are a marriage between a Mirror and Grid struct. They use the data composed in each to carry out a preprocessing step useful in solving boundary-value problems. It is advisable to run the constructor using multiple processors since it can involve a lot of calculation. The constructor can be called simply with GhostData(M::Mirror, grd::Grid).
+
+#### Ghost value extrapolation
+
+To impose boundary conditions, we need to set values at ghost points according to values at interior points. For Neumann boundary conditions, we can do this with a symmetric condition: apply the mirror_image function to a ghost point, and from that mirror image find the nearest grid-point enclosed by the boundary, then the symmetric condition is applied by setting the ghost value equal to the mirror value. For Dirichlet conditions, we instead apply anti-symmetric conditions, where the ghost value is set equal to minus the mirror value. Both of these operations are linear, and therefore can be represented by a matrix transformation. The GhostData constructor creates this matrix as an attribute called "R".
+
+By default, R will always apply a symmetric extrapolation. To get anti-symmetric extrapolation, we use the flip_segment function. Given a list of indices inds corresponding to specific segments of the polygon boundary, we can "flip" between symmetric and anti-symmetric conditions with respect to those specific segments. flip_segment(gd::GhostData, inds) returns a new GhostData struct with a modified R matrix, where anti-symmetric conditions will now be used for the segments corresponding with inds. flip_segment will also turn anti-symmetric conditions into symmetric conditions, so applying the function again to the new GhostData struct will result in a copy of the original GhostData struct we started with.
+
+#### Imposing boundary conditions (simple)
+
+Say we want to numerically evolve the Schroedinger equation for a free particle. Having defined a GhostData struct called gd, we could easily account for homogeneous Dirichlet or Neumann conditions like this:
+
+    # define laplacian matrix
+    L = operator_to_grid(grd::Grid) do
+        Dxx = spdiagm(1 => ones(grd._Nx-1))
+        Dxx += spdiagm(-1 => ones(grd._Nx-1))
+        Dxx += spdiagm(0 => -2*ones(grd._Nx))
+
+        Dyy = spdiagm(1 => ones(grd._Ny-1))
+        Dyy += spdiagm(-1 => ones(grd._Ny-1))
+        Dyy += spdiagm(0 => -2*ones(grd._Ny))
+
+        kron(Dyy, Dxx) / grd.dr^2
+    end
+
+    # update wavefunction with forward-Euler (hbar/m = 2)
+    psi += dt*im*L*psi
+
+    # impose boundary conditions
+    psi = gd.R*psi
+
+The code following the definition of the laplacian would be all it takes to update the wavefunction by one timestep while satisfying the boundary conditions, provided that forward-Euler method was deemed appropriate.
+
+We can modify this to satisfy inhomogeneous conditions as well. This is done by instead imposing (psi - psi_b) = gd.R*(psi - psi_b), where psi_b is either the boundary value for a Dirichlet condition, or its normal derivative at the boundary is the boundary value for a Neumann condition.

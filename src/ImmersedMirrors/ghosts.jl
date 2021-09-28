@@ -58,11 +58,11 @@ function GhostData(M::Mirror, grd::Grid)
 end
 
 
-function flip_segments(gd::GhostData, bdry)
+function flip_segments(gd::GhostData, inds)
 
     R = gd.R
-    fac = gd.flip_factors[bdry]
-    for j=1:size(factors)[1]
+    fac = gd.flip_factors[inds]
+    for j=1:size(fac)[1]
         R = Diagonal(vec(fac[j,:])) * R
     end
 
