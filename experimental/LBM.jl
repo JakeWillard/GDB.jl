@@ -1,6 +1,7 @@
 using Plots
 using LinearAlgebra
 using SparseArrays
+using Arpack
 # 1. initialize rho, uvec, f_i and feq_i
 # 2. Streaming: move f_i -> f*_i in the direction of evec_i
 # 3. Compute macroscopic rho and uvec from f*_i using:
@@ -112,46 +113,27 @@ function lattice_boltzmann_method(xres, yres, f, N, tau, deltax, deltat, count=0
     end
     
     stensor = PeriodicStreamTensor(xres, yres)
-    fnewtransform = stensor * ftransform
+    fnew = stensor * ftransform
 
-    fnew = zeros(xres, yres, 9)
-    for j=1:yres
-        for i=1:xres
-            fnew[i,j,:] = fnewtransform[(j-1)*xres+i,:]
-        end
+    rho = zeros((xres*yres))
+    for i=1:xres*yres
+        rho[i] = sum(fnew[i,:])
     end
 
-    rho = zeros((xres, yres))
-    for i=1:xres
-        for j=1:yres
-            for k=1:9
-                rho[i,j] = rho[i,j] + fnew[i,j,k]
-            end
-        end
+    u = zeros(xres*yres, 2)
+    for i=1:xres*yres
+        ux = (fnew[i,2] - fnew[i,4] + 1/sqrt(2) * (fnew[i,6] + fnew[i,9] - fnew[i,7] - fnew[i,8])) / rho[i]
+        uy = (fnew[i,3] - fnew[i,5] + 1/sqrt(2) * (fnew[i,6] + fnew[i,8] - fnew[i,9] - fnew[i,8])) / rho[i]
+        u[i,1] = ux
+        u[i,2] = uy
     end
 
-    u = zeros((xres, yres, 9))
-    for i=1:xres
-        for j=1:yres
-            for k=1:9
-                u[i,j,k] = fnew[i,j,k]/rho[i,j]
-                # u[i,j,k] = c*fnew[i,j,k]/rho[i,j]
-            end
-        end
-    end
+    unitvecs = zeros(9,2)
+    unitvecs[:,1] = [0, c, 0, -c, 0, 1/sqrt(2)*c, -1/sqrt(2)*c, -1/sqrt(2)*c, 1/sqrt(2)*c]
+    unitvecs[:,2] = [0, 0, c, 0, -c, 1/sqrt(2)*c, 1/sqrt(2)*c, -1/sqrt(2)*c, -1/sqrt(2)*c]
 
     w = zeros(9)
-    w[1] = 0
-    w[2] = c
-    w[3] = c
-    w[4] = c
-    w[5] = c
-    w[6] = c
-    w[7] = c
-    w[8] = c
-    w[9] = c
-
-    """w[1] = 4/9
+    w[1] = 4/9
     w[2] = 1/9
     w[3] = 1/9
     w[4] = 1/9
@@ -159,33 +141,26 @@ function lattice_boltzmann_method(xres, yres, f, N, tau, deltax, deltat, count=0
     w[6] = 1/36
     w[7] = 1/36
     w[8] = 1/36
-    w[9] = 1/36"""
+    w[9] = 1/36
 
-    s = zeros((xres, yres, 9))
-    usquared = zeros((xres, yres))
-    for i=1:xres
-        for j=1:yres
-            for k=1:9
-                usquared[i,j] = usquared[i,j] + u[i,j,k]^2
-            end
-            for k=1:9
-                s[i,j,k] = w[k] * (3*u[i,j,k]/c + 9/2*u[i,j,k]^2/c^2 - 3/2*usquared[i,j]/c^2)
-            end
-        end
+    s = zeros((xres*yres, 9))
+    usquared = zeros((xres*yres))
+    for i=1:xres*yres
+        usquared[i] = dot(u[i,:],u[i,:])
+        s[i,:] = w[:] .* (3*(unitvecs*u[i,:])/c^2 .+ 9/2*((unitvecs*u[i,:])).^2/c^3 .- 3/2*usquared[i]/c^2)
     end
 
-
-    feq = zeros((xres, yres, 9))
-    for i=1:xres
-        for j=1:yres
-            for k=1:9
-                feq[i,j,k] = w[k]*rho[i,j] + rho[i,j]*s[i,j,k]
-            end
-        end
+    feq = zeros((xres*yres, 9))
+    for i=1:xres*yres
+        feq[i,:] = w[:].*rho[i] .+ rho[i].*s[i,:]
     end
 
-    fnext = zeros((xres, yres, 9))
-    for i=1:xres
+    fnext = zeros((xres*yres, 9))
+    for i=1:xres*yres
+        fnext[i,:] = fnew[i,:] .- (deltat/(tau+.5*deltat)).*(fnew[i,:] - feq[i,:])
+    end
+
+    """for i=1:xres
         for j=1:yres
             for k=1:9
                 # fnext[i,j,k] = 1/(1 - 1/tau) * (fnew[i,j,k] - 1/tau*feq[i,j,k])
@@ -193,18 +168,25 @@ function lattice_boltzmann_method(xres, yres, f, N, tau, deltax, deltat, count=0
                 fnext[i,j,k] = fnew[i,j,k] - (deltat/(tau+.5*deltat))*(fnew[i,j,k]-feq[i,j,k])
             end
         end
+    end"""
+
+    fn = zeros(xres, yres, 9)
+    for j=1:yres
+        for i=1:xres
+            fn[i,j,:] = fnext[(j-1)*xres+i,:]
+        end
     end
 
     count = count + 1
     if count < N
-        lattice_boltzmann_method(xres, yres, fnext, N, tau, c, count)
+        lattice_boltzmann_method(xres, yres, fn, N, tau, deltax, deltat, count)
     else
-        return fnext
+        return fn, rho
     end
 end
 
-xres = Int32(200)
-yres = Int32(200)
+xres = 100
+yres = 100
 # gaussian distribution in x and y?
 fgauss = zeros(xres, yres, 9)
 for i=1:xres
@@ -224,37 +206,60 @@ for i=1:xres
     end
 end
 
-N = 200
+N = 100
 tau = 10000
 deltax = 1
 deltat = 1
 c = deltax/deltat
 
-"""f = lattice_boltzmann_method(xres, yres, fgauss, N, tau, deltax, deltat)
-fplot = zeros(xres, yres)
-f0 = zeros(xres, yres)
-for i=1:xres
-    for j=1:yres
-        for k=1:9
-            fplot[i,j] = fplot[i,j] + f[i,j,k]
-        end
-        f0[i,j] = f[i,j,5]
-    end
-end
-"""
 
-"""anim = @animate for i=1:N
-    fsine = lattice_boltzmann_method(xres, yres, fsine, 1, tau, deltax, deltat)
+#=rhofull = zeros(xres*yres)
+anim = @animate for i=1:N
+    fsine, rho = lattice_boltzmann_method(xres, yres, fsine, 1, tau, deltax, deltat)
     fplot = zeros(xres, yres)
-    for i=1:xres
-        for j=1:yres
+    if i==1
+        rhofull = rho
+    else
+        rhofull = hcat(rhofull, rho)
+    end
+    rhot = zeros(xres, yres)
+    for j=1:yres
+        for i=1:xres
+            rhot[i,j] = rho[(j-1)*xres+i]
             for k=1:9
                 fplot[i,j] = fplot[i,j] + fsine[i,j,k]
             end
-            f0[i,j] = f[i,j,5]
         end
     end
     println(fplot[Int32(xres/2),Int32(yres/2)])
-    heatmap(fplot)
+    heatmap(rhot)
 end
-gif(anim, fps=10)"""
+# println(size(rhofull))
+p = size(rhofull)[2]
+covarmatrix = 1/(p-1) * rhofull * transpose(rhofull)
+
+"""evals = eigvals(covarmatrix)
+evecs = eigvecs(covarmatrix)
+# println(size(evals))
+# println(abs(evals[1]))
+absevals = zeros(size(evals)[1])
+for i=1:size(evals)[1]
+    absevals[i] = Float64(abs(evals[i]))
+end
+# println(absevals[1])
+sortedevals = sort(absevals)
+# print(sortedevals[23])
+print(sortedevals)"""
+
+evals, evecs = eigs(covarmatrix, nev=20, which=:LM)
+println(evals)
+
+evecstransform = zeros(xres, yres)
+for j=1:yres
+    for i=1:xres
+        evecstransform[i,j] = evecs[(j-1)*xres+i,3]
+    end
+end
+
+gif(anim, fps=10)
+heatmap(evecstransform)=#
