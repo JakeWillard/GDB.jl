@@ -15,19 +15,19 @@ struct Grid
 
 end
 
-function Grid(M::Mirror, h::Float64, r0::Vector{Float64}, r1::Vector{Float64}, p::Int64)
+function Grid(M::Mirror, h::Float64, r0::Vector{Float64}, r1::Vector{Float64}, p::Int64; Nbuffer=100)
 
-    deltaX = r1_guess[1] - r0[1]
-    deltaY = r1_guess[2] - r0[2]
+    deltaX = r1[1] - r0[1]
+    deltaY = r1[2] - r0[2]
 
     if deltaX < deltaY
         Nx = 2^p
         dr = deltaX / Nx
-        Ny = div(deltaY, dr)
+        Ny = Int64(div(deltaY, dr))
     else
         Ny = 2^p
         dr = deltaY / Ny
-        Nx = div(deltaX, dr)
+        Nx = Int64(div(deltaX, dr))
     end
 
     # recalculate r1
@@ -59,7 +59,7 @@ function Grid(M::Mirror, h::Float64, r0::Vector{Float64}, r1::Vector{Float64}, p
     end
 
     Proj = sparse(proj_rows[1:k], proj_cols[1:k], proj_vals[1:k], k, _Nx*_Ny)
-    return Grid(r0, r1, points[:,1:k], Proj, dr, k _Nx, _Ny, Nbuffer, _nan_outside_boundaries)
+    return Grid(r0, r1, points[:,1:k], Proj, dr, k, _Nx, _Ny, Nbuffer, _nan_outside_boundaries)
 end
 
 

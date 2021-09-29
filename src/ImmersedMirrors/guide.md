@@ -72,7 +72,7 @@ Grids have an attribute called "points", which is of size 2 x Nk, which Nk is th
     f_as_vector_alt = []
     for k=1:grd.Nk
         x, y = grd.points[:,k]
-        f_as_vector = [f_as_vector; sin(x)*sin(y)]
+        f_as_vector = [f_as_vector_alt; sin(x)*sin(y)]
     end
 
     @assert all(f_as_vector .== f_as_vector_alt)
@@ -87,11 +87,11 @@ It is convenient to think of vectors like f_as_vector defined above as living in
         sin(x)*sin(y)
     end
 
-    fvec_rec = []
+    fvec_rec = Float64[]
     for j=1:grd._Ny
         for i=1:grd._Nx
-            x = -1.0 + 0.01*(i-1)
-            y = -1.0 + 0.01*(j-1)
+            x = grd.r0[1] + grd.dr*(i-1)
+            y = grd.r0[2] + grd.dr*(j-1)
             fvec_rec = [fvec_rec; sin(x)*sin(y)]
         end
     end
@@ -202,4 +202,17 @@ We have just solved the Poisson equation Del^2 phi = sin(x)sin(y) with arbitrary
 
 #### Inhomogeneous generalization
 
-This is easily generalized to the inhomogeneous case. For the ghost value extrapolation, there is a function extrapolate_ghosts which accomplishes this. With a function 
+The fully generalized version of the above procedure for inhomogeneous boundary conditions is wrapped up in the function constrain_system(A::SparseMatrixCSC, b::Vector{Float64}, xb::Vector{Float64}, gd::GhostData). A and b represent the linear problem we want to solve Ax=b, and xb is the vector representing the function that defines our boundary value.
+
+constrain_system returns a tuple (Anew, bnew, Pi, c), where we obtain our solution on the ghost-exclusive space by solving Anew x = bnew, and then that is mapped onto the ghost-inclusive space via Pi x + c. The following repeats the calculation made in the previous section, but with an inhomogeneous boundary condition:
+
+    rhs = function_to_grid(grd) do x,y
+        sin(x)*sin(y)
+    end
+
+    fb = function_to_grid(grd) do x,y
+        norm([x,y])
+    end
+
+    Anew, bnew, Pi, c = constrain_system(L, rhs, fb, gd::GhostData)
+    phi = Pi * (Anew \ bnew) + c

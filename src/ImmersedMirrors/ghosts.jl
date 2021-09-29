@@ -30,7 +30,7 @@ function GhostData(M::Mirror, grd::Grid)
 
             j = Int(ceil(k_cart / grd._Nx))
             i = k_cart - (j - 1) * grd._Nx
-            x, y, di, dj = mirror_image(grd.points[:,k]..., grd.dx, grd.dy, M)
+            x, y, di, dj = mirror_image(grd.points[:,k]..., grd.dr, grd.dr, M)
             i += di
             j += dj
             # @assert distance_to_mirror(x, y, M)[1] > 0
@@ -70,19 +70,15 @@ function flip_segments(gd::GhostData, inds)
 end
 
 
-function extrapolate_values(x::Vector{Float64}, xb::Vector{Float64}, gd::GhostData)
-
-    return gd.R*transpose(gc.Proj)*x + (I - gd.R)*xb
-end
-
-
-function require_boundary_conditions(A::SparseMatrixCSC, gd::GhostData)
+function constrain_system(A::SparseMatrixCSC, b::Vector{Float64}, xb::Vector{Float64}, gd::GhostData)
 
     P = gd.Proj
     Pt = transpose(P)
+    c = (I - gd.R)*xb
 
-    Anew = P*A*gd.R*Pt
-    Bterm = P*A*(I - gd.R)
+    Anew = P * A * Pt
+    bnew = P*b - P*A*c
+    Pi = gd.R * Pt
 
-    return Anew, Bterm
+    return Anew, bnew, Pi, c
 end

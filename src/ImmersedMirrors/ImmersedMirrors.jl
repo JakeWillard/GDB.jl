@@ -10,8 +10,8 @@ using Distributed
 @everywhere using LinearAlgebra, SparseArrays, ProgressMeter, ForwardDiff
 using Logging, RecipesBase
 
-include("./grid.jl")
 include("./mirrors.jl")
+include("./grid.jl")
 include("./ghosts.jl")
 
 end
