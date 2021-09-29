@@ -1,4 +1,15 @@
 
+function rk4_step(r::Vector{Float64}, f::Function, ds::Float64)
+
+    k1 = f(r)
+    k2 = f(r + ds*k1/2)
+    k3 = f(r + ds*k2/2)
+    k4 = f(r + ds*k3)
+
+    return r + ds*(k1 + 2*k2 + 2*k3 + k4) / 6
+end
+
+
 function distance_to_segment(x, y, vert0::Vector{Float64}, vert1::Vector{Float64})
 
     xs, ys = [x, y] - vert0
