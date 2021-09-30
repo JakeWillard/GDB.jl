@@ -1,44 +1,79 @@
 
-function circle_to_shape(z, alpha, kappa)
+function generate_maps(ep, kapp, delta, Nv)
 
-    _a = 0.5*(z + 1/z)
-    _b = 0.5*(z - 1/z)
-    return _a*cosh(alpha*_b) + _b*sinh(alpha*_b) + kappa*_b
+    alpha = asin(delta)
+
+    ts = LinRange(0, 2*pi, Nv+1)[1:Nv]
+    verts = zeros(Nv, 2)
+    verts[:,1] = ep*cos.(ts + alpha*sin.(ts))
+    verts[:,2] = ep*kapp*sin.(ts)
+
+    f = ConformalMap(verts, 0.0)
+    finv = inv(f)
+
+    return f, finv
 end
 
 
-function diff_circle_to_shape(z, alpha, kappa)
+struct ExternalCoil
 
-    _a = cosh(alpha*(z - 1/z)/2)
-    _b = sinh(alpha*(z - 1/z)/2)
-    _c = _a + _b
-    _d = _a - _b
-    _e = (_c + kappa) - (_d - kappa)/z^2
-    _f = 0.5*alpha*(z + 1/z)*_c
-    _g = 0.5*alpha*(1/z + 1/z^3)*_d
+    Bref :: Float64
+    refdist :: Float64
+    r0 :: Vector{Float64}
 
-    return (_f + _g) / 2
 end
 
 
-function shape_to_circle(w, alpha, kappa)
+function (c::ExternalCoil)(x::Float64, y::Float64)
 
-    r = circle_to_shape(w, alpha, kappa) - w
-    z = w
+    r = norm([x,y] - c.r0)
+    return c.refdist*c.Bref*log(r / c.refdist)
+end
 
-    xs = zeros(10)
-    ys = zeros(10)
-    for i=1:10
-        z -= r / diff_circle_to_shape(z, alpha, kappa)
-        r = circle_to_shape(z, alpha, kappa) - w
-        xs[i] = real(z)
-        ys[i] = imag(z)
+
+function (c::ExternalCoil)(z::Complex{Float64})
+
+    return c(real(z), imag(z))
+end
+
+
+function fourier_interp(dat)
+
+    C = fft(dat)
+
+    f(t) = begin
+
+        Exps = [exp(2*pi*im*n*t) for n=1:50]
+        Exps = [Exps; reverse(conj.(Exps))]
+        return (C[1] + dot(C[2:end], Exps.^t)) / 101
     end
-    # while abs(r) > 1e-8
-    #     z -= r / diff_circle_to_shape(z, alpha, kappa)
-    #     r = circle_to_shape(z, alpha, kappa) - w
-    # end
 
-    p = plot(xs, ys)
-    return p
+    return f
+
+
+    return t -> ((C[1] + dot(C[2:end], Exps.^t)) / 101)
+end
+
+
+function generate_edge_field(Bp::Float64, coils::Vector{ExternalCoil}, ep, kapp, delta, Nv)
+
+    f, finv = generate_maps(ep, kapp, delta, Nv)
+
+    circle_boundary = [0.95*exp(im*t) for t in LinRange(0, 2*pi,102)[1:101]]
+    shaped_boundary = finv.(circle_boundary)
+    psi_b = Float64[sum([c(z) for c in coils]) for z in shaped_boundary]
+
+    C = fft(psi_b) / 101
+
+    function psi(x, y)
+        z0 = x + im*y
+        z = f(z0)
+        V = [(z/0.95)^n for n=0:50]
+        V = [V; 1 ./ reverse(V[1:50])]
+        _a = real(dot(C, V))
+
+        return _a + 0.95*Bp*log(abs(z)/0.95)
+    end
+
+    return psi
 end
