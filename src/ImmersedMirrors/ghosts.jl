@@ -1,6 +1,6 @@
 
 
-struct GhostData
+struct Extrapolator
 
     Proj :: SparseMatrixCSC
     R :: SparseMatrixCSC
@@ -9,7 +9,7 @@ struct GhostData
 end
 
 
-function GhostData(M::Mirror, grd::Grid)
+function Extrapolator(M::Mirror, grd::Grid)
 
     chnl = RemoteChannel(()->Channel{Bool}(), 1)
     p = Progress(grd.Nk, desc="Resolving mirrors... ")
@@ -58,7 +58,7 @@ function GhostData(M::Mirror, grd::Grid)
 end
 
 
-function flip_segments(gd::GhostData, inds)
+function flip_segments(gd::Extrapolator, inds)
 
     R = gd.R
     fac = gd.flip_factors[inds]
@@ -66,19 +66,28 @@ function flip_segments(gd::GhostData, inds)
         R = Diagonal(vec(fac[j,:])) * R
     end
 
-    return GhostImage(gd.Proj, R, gd.flip_factors)
+    return Extrapolator(gd.Proj, R, gd.flip_factors)
 end
 
 
-function constrain_system(A::SparseMatrixCSC, b::Vector{Float64}, xb::Vector{Float64}, gd::GhostData)
+function (a::Extrapolator)(x::Vector{Float64}, xb::Vector{Float64})
+
+    if length(x) < length(xb)
+        v = transpose(gd.Proj)*x
+    else
+        v = x[:]
+    end
+    return a.R*v + (I - gd.R)*xb
+end
+
+
+function (a::Extrapolator)(A::SparseMatrixCSC, b::Vector{Float64}, xb::Vector{Float64})
 
     P = gd.Proj
     Pt = transpose(P)
-    c = (I - gd.R)*xb
 
-    Anew = P * A * Pt
-    bnew = P*b - P*A*c
-    Pi = gd.R * Pt
+    Anew = P * A * gd.R * Pt
+    bnew = P*b + P*A*(gd.R - I)*xb
 
-    return Anew, bnew, Pi, c
+    return Anew, bnew
 end
