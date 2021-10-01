@@ -54,20 +54,35 @@ function Extrapolator(M::Mirror, grd::Grid)
     Mirror = sparse([1:grd.Nk...], r_j, ones(grd.Nk), grd.Nk, grd._Nx*grd._Ny) * transpose(grd.Proj)
     Proj = sparse([1:length(proj_j)...], proj_j, ones(length(proj_j)), length(proj_j), grd.Nk)
 
-    return GhostData(Proj, Mirror, flip_factors)
+    return Extrapolator(Proj, Mirror, flip_factors)
 end
 
 
-function flip_segments(gd::Extrapolator, inds)
+function flip_segments(a::Extrapolator, inds)
 
-    R = gd.R
-    fac = gd.flip_factors[inds]
+    R = a.R
+    fac = a.flip_factors[inds]
     for j=1:size(fac)[1]
         R = Diagonal(vec(fac[j,:])) * R
     end
 
-    return Extrapolator(gd.Proj, R, gd.flip_factors)
+    return Extrapolator(a.Proj, R, a.flip_factors)
 end
+
+
+function make_dirichlet(a::Extrapolator, inds)
+
+    factors = a.flip_factors[inds,:]
+    N = size(factors)[2]
+    v = ones(N)
+    for i=1:size(factors)[1]
+        v = v .* factors[i,:]
+    end
+
+    R = Diagonal(v)
+    return Extrapolator(a.Proj, R, a.flip_factors)
+end
+
 
 
 function (a::Extrapolator)(x::Vector{Float64}, xb::Vector{Float64})

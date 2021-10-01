@@ -2,6 +2,12 @@
 
 ## ImmersedMirrors.jl Quick Guide
 
+### Dependencies
+
+* ProgressMeter.jl
+* ForwardDiff.jl
+* RecipesBase.jl
+
 
 ### Mirrors
 
@@ -124,8 +130,73 @@ To transform a vector to alter the ghost values in this way, simply pass the vec
 
     boundary_value = zeros(grd.Nk)
 
-    fvec_mirrored_ghosts = extr(fvec, boundary_value)
+    fvec_ex = extr(fvec, boundary_value)
 
-Note that the Extrapolator instance is callable like a function. Here, fvec_mirrored_ghosts is the same as fvec, but components corresponding to ghost points have be set according to the symmetry condition, which will set the derivative at the boundary equal to the derivative of the function represented by boundary_value. For this example, boundary_value is set to zero, corresponding to a homogeneous boundary condition.
+Note that the Extrapolator instance is callable like a function. Here, fvec_ex is the same as fvec, but components corresponding to ghost points have be set according to the symmetry condition, which will set the derivative at the boundary equal to the derivative of the function represented by boundary_value. For this example, boundary_value is set to zero, corresponding to a homogeneous boundary condition.
 
-A linear system can be constrained to implicitely satisfy the boundary conditions by passing different info into the Extrapolator:
+A linear system can be constrained to implicitly satisfy the boundary conditions by passing different info into the Extrapolator:
+
+    # compute extrapolator
+    extr = Extrapolator(M::Mirror, grd::Grid)
+
+    # define laplacian matrix
+    L = operator_to_grid(grd::Grid) do
+        Dxx = spdiagm(1 => ones(grd._Nx-1))
+        Dxx += spdiagm(-1 => ones(grd._Nx-1))
+        Dxx += spdiagm(0 => -2*ones(grd._Nx))
+
+        Dyy = spdiagm(1 => ones(grd._Ny-1))
+        Dyy += spdiagm(-1 => ones(grd._Ny-1))
+        Dyy += spdiagm(0 => -2*ones(grd._Ny))
+
+        kron(Dyy, Dxx) / grd.dr^2
+    end
+
+    # right hand side vector
+    rhs = zeros(grd.Nk)
+
+    # boundary value
+    bdry = function_to_grid(grd::Grid) do x,y
+        sin(x)^2
+    end
+
+    A, b = extr(L, rhs, bdry)
+    phi = extr(A \ b, bdry)
+
+This code solves Laplace equation Del^2 phi = 0 with inhomogeneous Neumann condition, where the normal derivative of phi - sin^2(x) is zero on the boundary. Calling the Extrapolator extr with the signature extr(L::SparseMatrixCSC, rhs::Vector{Float64}, bdry::Vector{Float64}) will return a new sparse matrix A and vector b. The linear system A x = b is a lower dimensional version of the system L x = rhs, where the boundary conditions have been automatically imposed on the system. Because the system is lower dimension, one would rightly expect that solving it via A \ b does not immediately result in a vector that represents the solution on our grid. To get that, we pass it into the Extrapolator again with the boundary value.
+
+#### Dirichlet conditions
+
+You can also generate Extrapolators that impose anti-symmetry conditions instead of symmetry conditions. The calculations involved are very similar to how the symmetry conditions are imposed, so there is no need to redo the preprocessing calculations. The change is made on a by segment basis, i.e. it is possible to impose a mix of Dirichlet and Neumann conditions on different parts of the boundary, and each side of the boundary polygonal-boundary can be independently switched to Dirichlet conditions.
+
+    extr0 = Extrapolator(M, grd)
+
+    inds = 1:5
+    extr = make_dirichlet(extr0, inds)
+
+In this case, we took an Extrapolator extr0 and switched the first 5 segments of the boundary (corresponding to the 5 vertices M.verts[:,1:5]) so that extr will now extrapolate ghost points near those segments using anti-symmetry conditions. Its not clear what this corresponds with geometrically, since we never defined the surface corresponding to the Mirror struct. Here is a more clear example:
+
+    # make Mirror corresponding to annalus
+    thetas = LinRange(0, 2*pi, 11)[1:10]
+    chain1 = zeros(2, 10)
+    chain2 = zeros(2, 10)
+    for i=1:10
+        chain1[:,i] = 2*[cos(thetas[i]), sin(thetas[i])]
+        chain2[:,i] = [cos(thetas[i]), -sin(thetas[i])]
+    end
+    M = Mirror([chain1, chain2])
+
+    # define Grid
+    r0 = [-2.1, -2.1]
+    r1 = [2.1, 2.1]
+    h = 0.1
+    grd = Grid(M::Mirror, h, r0, r1, 8)
+
+    # default Neumann Extrapolator
+    extr_neumann = Extrapolator(M, grd)
+
+    # make outer boundary dirichlet
+    inds = 1:10
+    extr = make_dirichlet(extr_neumann, inds)
+
+Here, we defined the boundary to approximate an annalus like we did at the beginning of this guide. The vertices M.verts[:,1:10] correspond to the outer boundary, so we can make the Extrapolator impose Dirichlet conditions on the outer boundary by passing 1:10 into the make_dirichlet function.
