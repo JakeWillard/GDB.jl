@@ -7,8 +7,8 @@ function sparse_regression(X, Theta, lambda, n)
     C = Theta \ X
 
     # find coefficients and apply threshold
-    i = findall(abs.(C) .< lambda)
-    j = findall(abs.(C) > lambda)
+    i = abs.(C) .< lambda
+    j = 1 .- i
     C[i] .= 0
 
     for _=1:n
