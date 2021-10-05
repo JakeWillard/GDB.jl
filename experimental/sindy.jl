@@ -15,7 +15,11 @@ function sparse_regression(X, Theta, lambda; maxiters=20)
     for _=1:maxiters
 
         for k=1:N
-            C[j[:,k],k] = Theta[:,j[:,k]] \ X[:,k]
+            if all(i[:,k])
+                C[:,k] .= 0
+            else
+                C[j[:,k],k] = Theta[:,j[:,k]] \ X[:,k]
+            end
         end
 
         # find coefficients and apply threshold
