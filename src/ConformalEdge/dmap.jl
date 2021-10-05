@@ -1,4 +1,3 @@
-
 struct DMap
 
     params :: Tuple{Float64, Float64, Float64}
@@ -46,8 +45,7 @@ function (dm::DMap)(psi::Function)
     a = 2*real.(C[2:501]) / 1001
     b = -2*imag.(C[2:501]) / 1001
 
-    psi_v(x,y) = begin
-        z = dm(x,y)
+    psi_v(z) = begin
         r = abs(z)
         t = angle(z)
         return c0 + sum([(r/0.95)^k * (a[k]*cos(k*t) + b[k]*sin(k*t)) for k=1:500])
