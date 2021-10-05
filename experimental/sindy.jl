@@ -8,7 +8,7 @@ function sparse_regression(X, Theta, lambda; maxiters=20)
 
     # find coefficients and apply threshold
     i = abs.(C) .< lambda
-    j = 1 .- i
+    j = Vector{Bool}(1 .- i)
     C[i] .= 0
     sparsity = sum(i[:])
 
@@ -24,7 +24,7 @@ function sparse_regression(X, Theta, lambda; maxiters=20)
 
         # find coefficients and apply threshold
         i = abs.(C) .< lambda
-        j = 1 .- i
+        j = Vector{Bool}(1 .- i)
         C[i] .= 0
 
         # if the sparsity hasn't changed, stop iteration
