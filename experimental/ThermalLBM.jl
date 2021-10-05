@@ -132,11 +132,11 @@ function thermal_lattice_boltzmann_method(streamtensor, Dx, Dy, Dxx, Dyy, xres, 
     end
     
 
-    return fnext, gnext, q, rho, u
+    return fnext, gnext, q, rho, usquared
 end
 
 
-N = 10
+N = 100
 tau = 1000
 tauc = 1000
 deltax = 1
@@ -157,7 +157,7 @@ end
 xres = 100
 yres = 100
 
-stensor = MirrorStreamTensor(xres, yres)
+stensor = PeriodicStreamTensor(xres, yres)
 
 sx = 5
 sy = 5
@@ -202,8 +202,8 @@ for j=1:yres
     end
 end
 
-
-"""anim = @animate for i=1:N
+rhofull = zeros(xres*yres)
+anim = @animate for i=1:N
     fs2, gs2, ex, ex1, ex2 = thermal_lattice_boltzmann_method(stensor, pDx, pDy, pDxx, pDyy, xres, yres, fs2, gs2, tau, tauc, deltax, deltat)
     fplot = zeros(xres, yres)
     gplot = zeros(xres, yres)
@@ -211,11 +211,15 @@ end
     exp1 = zeros(xres, yres)
     exp2 = zeros(xres, yres)
     ucheck = zeros(xres, yres)
+    if i==1
+        rhofull = ex2
+    else
+        rhofull = hcat(rhofull, ex2)
+    end
     for i=1:xres
         for j=1:yres
             exp1[i,j] = ex1[(j-1)*xres+i]
-            # explot[i,j] = ex[i,j,1]
-            exp2[i,j] = ex2[(j-1)*xres+i,2]
+            exp2[i,j] = ex2[(j-1)*xres+i]
             for k=1:9
                 fplot[i,j] = fplot[i,j] + fs2[(j-1)*xres+i,k]
                 gplot[i,j] = gplot[i,j] + gs2[(j-1)*xres+i,k]
@@ -228,4 +232,17 @@ end
     println(gplot[Int32(xres/2),Int32(yres/2)])
     heatmap(gplot, clims=(0,5))
 end
-gif(anim, fps=10)"""
+# gif(anim, fps=10)
+
+p = size(rhofull)[2]
+covarmatrix = 1/(p-1) * rhofull * transpose(rhofull)
+evals, evecs = eigs(covarmatrix, nev=20, which=:LM)
+
+evecstransform = zeros(xres, yres)
+for j=1:yres
+    for i=1:xres
+        evecstransform[i,j] = evecs[(j-1)*xres+i,3]
+    end
+end
+
+heatmap(evecstransform)
