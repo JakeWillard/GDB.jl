@@ -1,6 +1,16 @@
 
-function generate_maps(ep, kapp, delta, Nv)
+struct DMap
 
+    params :: Tuple{Float64, Float64, Float64}
+    d_to_c :: ConformalMap{Float64}
+    c_to_d :: InverseConformalMap{Float64}
+
+end
+
+
+function DMap(ep, kapp, delta, Nv)
+
+    params = (ep, kapp, delta)
     alpha = asin(delta)
 
     ts = LinRange(0, 2*pi, Nv+1)[1:Nv]
@@ -8,72 +18,38 @@ function generate_maps(ep, kapp, delta, Nv)
     verts[:,1] = ep*cos.(ts + alpha*sin.(ts))
     verts[:,2] = ep*kapp*sin.(ts)
 
-    f = ConformalMap(verts, 0.0)
-    finv = inv(f)
+    d_to_c = ConformalMap(verts, 0.0)
+    c_to_d = inv(d_to_c)
 
-    return f, finv
+    return DMap(params, d_to_c, c_to_d)
 end
 
 
-struct ExternalCoil
-
-    Bref :: Float64
-    refdist :: Float64
-    r0 :: Vector{Float64}
-
+function (dm::DMap)(x::Float64, y::Float64)
+    return dm.d_to_c(x + im*y)
 end
 
 
-function (c::ExternalCoil)(x::Float64, y::Float64)
-
-    r = norm([x,y] - c.r0)
-    return c.refdist*c.Bref*log(r / c.refdist)
+function (dm::DMap)(z::Complex{Float64})
+    zn = dm.c_to_d(z)
+    return real(zn), imag(zn)
 end
 
 
-function (c::ExternalCoil)(z::Complex{Float64})
+function (dm::DMap)(psi::Function)
 
-    return c(real(z), imag(z))
-end
+    z0 = 0.95*exp.(im*LinRange(0, 2*pi,1002)[1:1001])
+    psib = [psi(dm(z)...) for z in z0]
+    C = fft(psib)
 
+    c0 = real(C[1]) / 1001
+    a = 2*real.(C[2:501]) / 1001
+    b = -2*imag.(C[2:501]) / 1001
 
-function fourier_interp(dat)
-
-    C = fft(dat)
-
-    f(t) = begin
-
-        Exps = [exp(2*pi*im*n*t) for n=1:50]
-        Exps = [Exps; reverse(conj.(Exps))]
-        return (C[1] + dot(C[2:end], Exps.^t)) / 101
+    psi_v(x,y) = begin
+        z = dm(x,y)
+        r = abs(z)
+        t = angle(z)
+        return c0 + sum([(r/0.95)^k * (a[k]*cos(k*t) + b[k]*sin(k*t)) for k=1:500])
     end
-
-    return f
-
-
-    return t -> ((C[1] + dot(C[2:end], Exps.^t)) / 101)
-end
-
-
-function generate_edge_field(Bp::Float64, coils::Vector{ExternalCoil}, ep, kapp, delta, Nv)
-
-    f, finv = generate_maps(ep, kapp, delta, Nv)
-
-    circle_boundary = [0.95*exp(im*t) for t in LinRange(0, 2*pi,102)[1:101]]
-    shaped_boundary = finv.(circle_boundary)
-    psi_b = Float64[sum([c(z) for c in coils]) for z in shaped_boundary]
-
-    C = fft(psi_b) / 101
-
-    function psi(x, y)
-        z0 = x + im*y
-        z = f(z0)
-        V = [(z/0.95)^n for n=0:50]
-        V = [V; 1 ./ reverse(V[1:50])]
-        _a = real(dot(C, V))
-
-        return _a + 0.95*Bp*log(abs(z)/0.95)
-    end
-
-    return psi
 end
