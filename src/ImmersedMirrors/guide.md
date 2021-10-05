@@ -1,4 +1,6 @@
-# ImmersedMirrors.jl Guide
+
+
+## ImmersedMirrors.jl Quick Guide
 
 ### Dependencies
 
@@ -6,105 +8,87 @@
 * ForwardDiff.jl
 * RecipesBase.jl
 
-### Overview
 
-This is a module for setting up immersed boundary problems in 2D using three basic structs: Mirror, Grid, and GhostData.
+### Mirrors
 
-A Mirror struct is used to represent a polygonal boundary for multiple-connected domains. As the name suggests, this boundary will be treated as a kind of mirror surface, so that points can be reflected across the boundary. The reflection operations are key to how we handle immersed boundary conditions.
+#### Define a Mirror
 
-A Grid struct represents the points used to discretize the space. Grid-points are arranged on a square lattice, but the overall arrangement is in general non-rectangular. Rather, the grid-points are chosen not to cover much more than the region enclosed by the boundaries, with a variable excess of exterior "ghost-points" which are needed to properly enforce boundary conditions.
+All you need for this is to represent the boundary of the domain as a collection of polygons. Each polygon should be represented by a list of vertices, and the order in which they are listed determines what regions get excluded from the domain: counter-clockwise results in the exterior being excluded from the domain, and clockwise results in the interior being excluded. This allows for the possibility of multiply-connected domains.
 
-A GhostData struct contains the output of an important preprocessing step in our approach to immersed boundary problems. It is with this struct that the values of quantities on ghost-points can be extrapolated from interior values in accordance with symmetric or anti-symmetric conditions. This functionality is all that is needed to enforce Neumann-like and Dirichlet-like boundary conditions.
-
-### Mirror
-
-#### Constructor
-
-A Mirror struct is initialized with a single input having type Vector{Matrix}. Each element of the vector is a 2xN matrix, N being some number, representing a closed chain of points (the first vertex of each chain is not double-counted). As the name suggests, these chains are meant to represent mirror surfaces in the plane: oriented curves that points in space can be reflected about. The following code creates a mirror out of 2 different circles approximated by 10-sided regular polygons:
+Call the constructor with Mirror(chains::Vector{Matrix{Float64}}). The input variable chains is a list of matrices, each matrix having size 2xN for some N, where N is the number of vertices for the particular chain. Here is an example:
 
     thetas = LinRange(0, 2*pi, 11)[1:10]
     chain1 = zeros(2, 10)
     chain2 = zeros(2, 10)
     for i=1:10
-        chain1[:,i] = [cos(thetas[i]) - 1, sin(thetas[i])]
-        chain2[:,i] = [cos(thetas[i]) + 1, sin(thetas[i])]
+      chain1[:,i] = 2*[cos(thetas[i]), sin(thetas[i])]
+      chain2[:,i] = [cos(thetas[i]), -sin(thetas[i])]
     end
 
     M = Mirror([chain1, chain2])
 
-The orientation of the chains will be important, so note how the vertices are listed in counter-clockwise order for both circles. Since all chains are closed loops, the orientation determines which side of the chain is considered "inside" or "outside". For vertices listed in counter-clockwise order, points enclosed by the loop are "inside" points. If we reverse the order, that will also reverse the orientation, so the points enclosed by the loop will be "outside" points. We choose the orientation based on whether we want the chain the represent an outer boundary of a domain, or the boundary of a "hole" in the domain. For example, we can define a Mirror corresponding with an annalus:
+This code creates a Mirror struct for a domain approximating an annalus with inner radius 1 and outer radius 2.
 
-    thetas = LinRange(0, 2*pi, 11)[1:10]
-    chain1 = zeros(2, 10)
-    chain2 = zeros(2, 10)
-    for i=1:10
-        chain1[:,i] = 2*[cos(thetas[i]), sin(thetas[i])]
-        chain2[:,i] = [cos(thetas[i]), -sin(thetas[i])]
-    end
 
-    M = Mirror([chain1, chain2])
+#### Distances and mirror images
 
-#### Usage
 
-distance_to_mirror(x, y, M::Mirror) returns a tuple (dist, k) where dist is the shortest distance from the point (x,y) to the mirror struct M, and k is the index corresponding to the nearest vertex. All of the vertices of all of the chains are listed together in the attribute "verts", so this nearest vertex can be referenced with M.verts[:,k]. The returned value dist is a signed distance, and it returns positive for interior points and negative for exterior points.
+You can compute a signed distance to the boundary using distance_to_mirror(x,y,M::Mirror), which returns a tuple (dist, k) where dist is the signed distance from the point (x,y) to the boundary represented by the Mirror struct M, and k is an index for the nearest vertex, which you can subsequently reference via M.verts[:,k]. The distance is signed because it is positive or negative depending on the orientation of the polygon. The distance is negative for points excluded from the domain, and it is positive for points included in the domain.
 
-mirror_image(x, y, M::Mirror) maps exterior points (x,y) to interior points with respect to a Mirror struct M, in a way corresponding to a reflection across the nearest chain. The function acts as an identity operation for interior points, i.e. (x,y) = mirror_image(x, y, M) if distance_to_mirror(x, y, M)[1] > 0.
+As the name suggests, a Mirror struct is meant to represent the boundary as a reflecting surface. To reflect a point (x,y) across the boundary, use mirror_image(x,y,M::Mirror). However, a Mirror in this case is only reflecting for points excluded from the domain, since we use this to reflect ghost-points. For included points the function acts as an identity, i.e. (x,y) = mirror_image(x, y, M) if distance_to_mirror(x, y, M)[1] > 0.
+
 
 ### Grids
 
-#### Constructor
+#### Defining a Grid
 
-A Grid struct is initialized with three pieces of info: (1) a Mirror struct to define the boundary for our problem, (2) a parameter determining the number of ghost-points, (3) a bounding box that contains the domain, and (4) a parameter determining the resolution of the grid. The function signature is therefore Grid(M, h, r0, r1, p), where the input variables are:
-* M -- a Mirror struct
-* h -- thickness of the ghost region. (A ghost point satisfies -h < distance_to_mirror(x,y,M) < 0)
-* r0 -- vector for the bottom left corner of the bounding box.
-* r1 -- vector for the top right corner of the bounding box.
-* p -- N=2^p, where N is the number of grid-points along the shortest side of the bounding box. For example, if (r1 - r0)[1] < (r1 - r0)[2], then Nx = 2^p. If (r1 - r0)[1] > (r1 - r0)[2], then Ny = 2^p.
+The Grid struct contains information associated with a non-rectangular grid with a square lattice that covers the domain defined by a Mirror struct. It is non-rectangular in general, since the grid-points will be arranged in a way to cover not much more than the points included in the domain. The grid will include ghost-points outside the domain within some given distance, so that the boundary is immersed in the grid and has some number of points surrounding it.
 
-#### The points attribute and function_to_grid
+Use the constructor Grid(M::Mirror, h::Float64, r0::Vector{Float64}, r1::Vector{Float64}, p::Int64). The meanings of the inputs are:
+* M is the mirror struct that defines the domain.
+* h is the thickness of the ghost region.
+* r0 is the bottom-left position of the bounding box.
+* r1 is the top-right position of the bounding box.
+* p determines the resolution: # of grid-points ~ 2^(2p).
 
-Grids have an attribute called "points", which is of size 2 x Nk, which Nk is the number of grid-points. Each column of points is a position (x,y) inside the domain. We can use Grids to evaluate a function at each of these points and store those variables in a vector. We do this with function_to_grid:
+r0 and r1 determine a bounding box that begins the arrangement of the grid-points. The arrangement starts off as a rectangular grid with dimension Nx x Ny where r0 and r1 are the bottom-left and top-right corners respectively. p determines the resolution by setting the number of grid-points along the shortest dimension: if (r1 - r0)[2] > (r1 - r0)[1], then Nx = 2^p, but if (r1 - r0)[2] < (r1 - r0)[1], then Ny = 2^p. The lattice is square, so this calculation determines the spacing between grid-points dr. The number of grid-points in the other direction is then fixed to be whatever fills the bounding box.
+
+The following code creates a grid to cover a domain defined by a Mirror struct M:
+
+    r0 = [-1.0, -2.0]
+    r1 = [1.0, 2.0]
+    h = 0.1
+    grd = Grid(M::Mirror, h, r0, r1, 8)
+
+The bounding box for this region is a 2 x 4 rectangle, so Nx will be 2^8, the spacing will be dr=2/Nx, and Ny will be div(4, dr). To see what the actual grid-points are, you can reference them with grd.points, which is a 2xNk matrix where Nk is the number of grid-points (always less than or equal to Nx*Ny). Nk can be referenced as well with grd.Nk.
+
+#### Representing and plotting functions
+
+Functions of (x,y) have a representation on the grid as vectors of length Nk. You can easily compute such vectors:
+
+    f(x,y) = sin(x)*sin(y)
+    f_as_vector = function_to_grid(f, grd::Grid)
+
+    @assert all(f_as_vector .== [f(grd.points[:,k]...) for k=1:grd.Nk])
+
+This code created a vector representing the function sin(x)sin(y). The last part of the code shows what function_to_grid does: it is nothing more than the calculation [f(grd.points[:,k]) for k=1:grd.Nk].
+
+This module includes a plotting recipe for vectors representing functions, which will make Plots-compatible function interpret the vector as 2D data:
 
     f_as_vector = function_to_grid(grd::Grid) do x,y
         sin(x)*sin(y)
     end
 
-    f_as_vector_alt = []
-    for k=1:grd.Nk
-        x, y = grd.points[:,k]
-        f_as_vector = [f_as_vector_alt; sin(x)*sin(y)]
-    end
+    using Plots
+    heatmap(f_as_vector, grd::Grid)
+    contour(f_as_vector, grd::Grid)
 
-    @assert all(f_as_vector .== f_as_vector_alt)
+I repeated the calculation of f_as_vector here to illustrate the do-block syntax.
 
-The above code demonstrates the usage of function_to_grid, while also showing what that function does by constructing the output vector with an explicit loop over grd.points.
 
-#### The projection matrix
+#### Representing linear operators
 
-It is convenient to think of vectors like f_as_vector defined above as living in a vector space associated with the list of points grd.points. So from here on, I will talk about a "grid space" as being that kind of vector space. Remember that the Grid constructor used input data corresponding to a rectangular grid, with corners at r0 and r1, which has some dimension Nx x Ny. In general, this ends up being translated into a larger rectangular grid, with dimension _Nx x _Ny where _Nx = Nx + 2Nbuffer and _Ny = Ny + 2Nbuffer, Nbuffer is an optional keyword argument with default value 100. This larger rectangle also has different corners offset by Nbuffer*grd.dr. This rectangular grid also has a vector space, and it is convenient to be able to define certain things on the rectangular space and then project them onto the non-rectangular space. The Proj attribute is a sparse matrix that does exactly this. The following should make it clear:
-
-    fvec_non_rec = function_to_grid(grd::Grid) do x,y
-        sin(x)*sin(y)
-    end
-
-    fvec_rec = Float64[]
-    for j=1:grd._Ny
-        for i=1:grd._Nx
-            x = grd.r0[1] + grd.dr*(i-1)
-            y = grd.r0[2] + grd.dr*(j-1)
-            fvec_rec = [fvec_rec; sin(x)*sin(y)]
-        end
-    end
-
-    @assert all(fvec_non_rec .== grd.Proj * fvec_rec)
-
-Here, rectangular and non-rectangular version of the function sin(x)sin(y) are calculated, and it is asserted that the non-rectangular version can be obtained from the rectangular version by applying the matrix transformation grd.Proj.
-
-#### Mapping linear operators
-
-It is often convenient to define linear operators on the rectangular space and then "translate" that matrix onto the non-rectangular space. This can only be done exactly if the transformation is invertible, and Proj is not generally invertible. However, there is an appropriate pseudoinverse in this case, which is Proj^T. This can be seen as a mapping from the non-rectangular space to the rectangular space assuming that everything is zero at points not contained in grd.points. This is an acceptable assumption to make, provided that the "ghost region" is sufficiently thick. In other words, h/grd.dr must not be too small, where h is the input variable controlling the thickness of the ghost region. If h and the grid resolution are chosen carefully, linear operators defined on the rectangular grid can be mapped onto the non-rectangular grid via Proj M Proj^T, and the resulting matrix will be a faithful representation of the matrix M everywhere inside the domain of interest.
-
-operator_to_grid is a function that will automatically project a matrix M defined on the rectangular space onto the non-rectangular space using Proj M Proj^T. This is done by defining M within a do-block:
+Linear operators that act on functions of (x,y) also have a representation of the grid as matrices. Computing matrices like this might be tricky to do since the grid is non-rectangular in general. For things like finite difference approximations, it would be much easier if the grid were rectangular at least. The Grid struct offers a convenient way to compute matrix representations for the grid provided that you know how to compute them on a non-rectangular grid:
 
     Diff_x = operator_to_grid(grd::Grid) do
         Dx = spdiagm(1 => ones(grd._Nx-1))
@@ -119,24 +103,41 @@ operator_to_grid is a function that will automatically project a matrix M define
 
     fvec_diffx = Diff_x * fvec
 
-The matrix Diff_x is just a first derivative matrix calculated using a central difference approximation. Note that the code within the do-block is nothing more than a crude method for computing a central difference matrix on a rectangular grid.
+Diff_x is a matrix representing a partial derivative with respect to x using a central different approximation. This matrix is used to compute fvec_diffx, which is a vector approximating the partial derivative of sin(x)sin(y) with respect to x. Note that the code inside the do-block is nothing more than a crude method for constructing a central difference matrix on a rectangular grid with dimension _Nx x _Ny. _Nx and _Ny are attributes of the Grid struct, and are not exactly the same as Nx and Ny described before. What they exactly correspond to is technical, the only thing we need to know here is that the code in the do-block must assume a rectangular grid having grd._Nx and grd._Ny as dimensions, and a square lattice with spacing grd.dr. The rest is taken care of by the function operator_to_grid, which maps the rectangular version of the operator to a suitable matrix representation for our grid.
+
+One important note is that this calculation relies on finding a mapping between the grid and a rectangular grid where the code in the do-block applies, which isn't actually possible to do exactly without some implicit assumption. Here, the implicit assumption will always be that functions are zero in fully excluded regions of the x-y plane, i.e. points that have distance_to_mirror(x,y,M)[1] < -h. This could be unacceptable in some cases, but for matrices that merely do local operations (finite difference matrices) the error will be localized to the very edge of the grid. So in those cases, you just need to be aware that the matrices won't be accurate representation of the operator on all of the ghost points. This won't be a problem in the case of boundary value problems using the extrapolation method described in the next section, and provided that the ghost region is not made too small.
 
 
-### GhostData
+### Extrapolators
 
-#### Constructor
 
-GhostData structs are a marriage between a Mirror and Grid struct. They use the data composed in each to carry out a preprocessing step useful in solving boundary-value problems. It is advisable to run the constructor using multiple processors since it can involve a lot of calculation. The constructor can be called simply with GhostData(M::Mirror, grd::Grid).
+#### Defining an Extrapolator
 
-#### Ghost value extrapolation
+An Extrapolator struct just stores the output of an important pre-processing step when setting up boundary value problems. All you need to do the calculation is call Extrapolator(M::Mirror, grd::Grid). This calculation could take some time, especially at high resolutions, so it is advisable to run this with multiple processors (does not necessitate shared memory).
 
-To impose boundary conditions, we need to set values at ghost points according to values at interior points. For Neumann boundary conditions, we can do this with a symmetric condition: apply the mirror_image function to a ghost point, and from that mirror image find the nearest grid-point enclosed by the boundary, then the symmetric condition is applied by setting the ghost value equal to the mirror value. For Dirichlet conditions, we instead apply anti-symmetric conditions, where the ghost value is set equal to minus the mirror value. Both of these operations are linear, and therefore can be represented by a matrix transformation. The GhostData constructor creates this matrix as an attribute called "R".
 
-By default, R will always apply a symmetric extrapolation. To get anti-symmetric extrapolation, we use the flip_segment function. Given a list of indices inds corresponding to specific segments of the polygon boundary, we can "flip" between symmetric and anti-symmetric conditions with respect to those specific segments. flip_segment(gd::GhostData, inds) returns a new GhostData struct with a modified R matrix, where anti-symmetric conditions will now be used for the segments corresponding with inds. flip_segment will also turn anti-symmetric conditions into symmetric conditions, so applying the function again to the new GhostData struct will result in a copy of the original GhostData struct we started with.
+#### Using the Extrapolator for Neumann conditions.
 
-#### Imposing boundary conditions (simple)
+By default, an Extrapolator can be used to impose Neumann boundary conditions (not necessarily homogeneous) by extrapolating values at ghost-points according to a symmetry condition. This is where the mirror_image function comes in: for homogeneous Neumann conditions, the value at a ghost-point (x,y) is simply set equal to the interior value found at the ghost point's mirror image using mirror_image(x,y,M::Mirror).
 
-Say we want to numerically evolve the Schroedinger equation for a free particle. Having defined a GhostData struct called gd, we could easily account for homogeneous Dirichlet or Neumann conditions like this:
+To transform a vector to alter the ghost values in this way, simply pass the vector into the Extrapolator struct itself:
+
+    fvec = function_to_grid(grd::Grid) do x,y
+        sin(x)*sin(y)
+    end
+
+    extr = Extrapolator(M::Mirror, grd::Grid)
+
+    boundary_value = zeros(grd.Nk)
+
+    fvec_ex = extr(fvec, boundary_value)
+
+Note that the Extrapolator instance is callable like a function. Here, fvec_ex is the same as fvec, but components corresponding to ghost points have be set according to the symmetry condition, which will set the derivative at the boundary equal to the derivative of the function represented by boundary_value. For this example, boundary_value is set to zero, corresponding to a homogeneous boundary condition.
+
+A linear system can be constrained to implicitly satisfy the boundary conditions by passing different info into the Extrapolator:
+
+    # compute extrapolator
+    extr = Extrapolator(M::Mirror, grd::Grid)
 
     # define laplacian matrix
     L = operator_to_grid(grd::Grid) do
@@ -151,68 +152,67 @@ Say we want to numerically evolve the Schroedinger equation for a free particle.
         kron(Dyy, Dxx) / grd.dr^2
     end
 
-    # update wavefunction with forward-Euler (hbar/m = 2)
-    psi += dt*im*L*psi
+    # right hand side vector
+    rhs = zeros(grd.Nk)
 
-    # impose boundary conditions
-    psi = gd.R*psi
-
-The code following the definition of the laplacian would be all it takes to update the wavefunction by one timestep while satisfying the boundary conditions, provided that forward-Euler method was deemed appropriate.
-
-We can modify this to satisfy inhomogeneous conditions as well. This is done by instead imposing (psi - psi_b) = gd.R*(psi - psi_b), where psi_b is either the boundary value for a Dirichlet condition, or its normal derivative at the boundary is the boundary value for a Neumann condition.
-
-#### Constraining linear systems
-
-Attached to GhostData structs is an attribute called Proj, which is another projection matrix that is similar but distinct from the Proj attached to Grid structs. Here, Proj is a projection from the non-rectangular space to an even smaller subspace defined by the points in grd.points that are not ghost points. From here, I will call the non-rectangular space that includes grid-points as the ghost-inclusive space, and this smaller subspace the ghost-exclusive space.
-
-The purpose of defining yet another projection onto yet another grid-space is clear if we make the following calculation:
-
-    # function returns laplacian on the ghost-inclusive space
-    L = operator_to_grid(grd::Grid) do
-
-        # code in the block creates laplacian on rectangular space
-        Dxx = spdiagm(1 => ones(grd._Nx-1))
-        Dxx += spdiagm(-1 => ones(grd._Nx-1))
-        Dxx += spdiagm(0 => -2*ones(grd._Nx))
-
-        Dyy = spdiagm(1 => ones(grd._Ny-1))
-        Dyy += spdiagm(-1 => ones(grd._Ny-1))
-        Dyy += spdiagm(0 => -2*ones(grd._Ny))
-
-        kron(Dyy, Dxx) / grd.dr^2
+    # boundary value
+    bdry = function_to_grid(grd::Grid) do x,y
+        sin(x)^2
     end
 
-    # one more projection to get laplacian on ghost-exclusive space.
-    L = gd.Proj * L * gd.R * transpose(gd.Proj)
+    A, b = extr(L, rhs, bdry)
+    phi = extr(A \ b, bdry)
 
-This code calculates a laplacian matrix again, but then carries out another projection of the form Proj L Proj^(-1). However, instead of using Proj^T as the pseudoinverse, now we use R Proj^T. R Proj^T will map vectors on the ghost-exclusive space into the ghost-inclusive space such that the ghost values are extrapolated via the transformation described previously. In this way, L is now a matrix representation of the laplacian that acts on the ghost-exclusive space in a way that automatically imposes homogeneous boundary conditions. This means that we can solve simple PDEs:
+This code solves Laplace equation Del^2 phi = 0 with inhomogeneous Neumann condition, where the normal derivative of phi - sin^2(x) is zero on the boundary. Calling the Extrapolator extr with the signature extr(L::SparseMatrixCSC, rhs::Vector{Float64}, bdry::Vector{Float64}) will return a new sparse matrix A and vector b. The linear system A x = b is a lower dimensional version of the system L x = rhs, where the boundary conditions have been automatically imposed on the system. Because the system is lower dimension, one would rightly expect that solving it via A \ b does not immediately result in a vector that represents the solution on our grid. To get that, we pass it into the Extrapolator again along with the boundary value.
 
-    rhs = function_to_grid(grd) do x,y
-        sin(x)*sin(y)
+#### Dirichlet conditions
+
+You can also generate Extrapolators that impose anti-symmetry conditions instead of symmetry conditions. The calculations involved are very similar to how the symmetry conditions are imposed, so there is no need to redo the preprocessing calculations. The change is made on a by segment basis, i.e. it is possible to impose a mix of Dirichlet and Neumann conditions on different parts of the boundary, and each side of the boundary polygon can be independently switched to Dirichlet conditions.
+
+    extr0 = Extrapolator(M, grd)
+
+    inds = 1:5
+    extr = make_dirichlet(extr0, inds)
+
+In this case, we took an Extrapolator extr0 and switched the first 5 segments of the boundary (corresponding to the 5 vertices M.verts[:,1:5]) so that extr will now extrapolate ghost points near those segments using anti-symmetry conditions. Its not clear what this corresponds with geometrically, since we never defined the surface corresponding to the Mirror struct. Here is a more clear example:
+
+    # make Mirror corresponding to annalus
+    thetas = LinRange(0, 2*pi, 11)[1:10]
+    chain1 = zeros(2, 10)
+    chain2 = zeros(2, 10)
+    for i=1:10
+        chain1[:,i] = 2*[cos(thetas[i]), sin(thetas[i])]
+        chain2[:,i] = [cos(thetas[i]), -sin(thetas[i])]
     end
-    rhs = gd.Proj * rhs
+    M = Mirror([chain1, chain2])
 
-    # solve poisson equation on ghost-exclusive space
-    phi_projected = L \ rhs
+    # define Grid
+    r0 = [-2.1, -2.1]
+    r1 = [2.1, 2.1]
+    h = 0.1
+    grd = Grid(M::Mirror, h, r0, r1, 8)
 
-    # extrapolate with gd.R to get solution on ghost-inclusive space
-    phi = gd.R * transpose(gd.Proj) * phi_proj
+    # default Neumann Extrapolator
+    extr_neumann = Extrapolator(M, grd)
 
-We have just solved the Poisson equation Del^2 phi = sin(x)sin(y) with arbitrary homogeneous boundary conditions defined by the GhostData struct gd.
+    # make outer boundary dirichlet
+    inds = 1:10
+    extr = make_dirichlet(extr_neumann, inds)
 
-#### Inhomogeneous generalization
+Here, we defined the boundary to approximate an annalus like we did at the beginning of this guide. The vertices M.verts[:,1:10] correspond to the outer boundary, so we can make the Extrapolator impose Dirichlet conditions on the outer boundary by passing 1:10 into the make_dirichlet function.
 
-The fully generalized version of the above procedure for inhomogeneous boundary conditions is wrapped up in the function constrain_system(A::SparseMatrixCSC, b::Vector{Float64}, xb::Vector{Float64}, gd::GhostData). A and b represent the linear problem we want to solve Ax=b, and xb is the vector representing the function that defines our boundary value.
+Even though it might seem as though there are two distinct surfaces here (the inner and outer boundary), it's important to note that the boundary conditions are not imposed seperetly. We still define a single vector for the boundary value, and extrapolation operations are evaluated together. As an example, here is how we could impose a homogeneous Neumann condition at the inner boundary and an inhomogeneous Dirichlet condition at the outer boundary:
 
-constrain_system returns a tuple (Anew, bnew, Pi, c), where we obtain our solution on the ghost-exclusive space by solving Anew x = bnew, and then that is mapped onto the ghost-inclusive space via Pi x + c. The following repeats the calculation made in the previous section, but with an inhomogeneous boundary condition:
-
-    rhs = function_to_grid(grd) do x,y
-        sin(x)*sin(y)
+    bdry = function_to_grid(grd::Grid) do x,y
+        r = norm([x,y])
+        if r < 1.5
+            return 0.0
+        else
+            return r
+        end
     end
 
-    fb = function_to_grid(grd) do x,y
-        norm([x,y])
-    end
+    A, b = extr(L, zeros(grd.Nk), bdry)
+    phi = extr(A \ b, bdry)
 
-    Anew, bnew, Pi, c = constrain_system(L, rhs, fb, gd::GhostData)
-    phi = Pi * (Anew \ bnew) + c
+This code solves the Laplace equation again, this time with a boundary value vector that is zero everywhere that r < 1.5, which will result in a homogeneous Neumann condition at the inner boundary, and equal to r for r > 1.5, which will result in a Dirichlet condition phi = r at the outer boundary.

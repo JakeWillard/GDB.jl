@@ -12,7 +12,7 @@ end
 function Extrapolator(M::Mirror, grd::Grid)
 
     chnl = RemoteChannel(()->Channel{Bool}(), 1)
-    p = Progress(grd.Nk, desc="Resolving mirrors... ")
+    p = Progress(grd.Nk, desc="Finding mirror images... ")
     @async while take!(chnl)
         next!(p)
     end
@@ -88,21 +88,21 @@ end
 function (a::Extrapolator)(x::Vector{Float64}, xb::Vector{Float64})
 
     if length(x) < length(xb)
-        v = transpose(gd.Proj)*x
+        v = transpose(a.Proj)*x
     else
         v = x[:]
     end
-    return a.R*v + (I - gd.R)*xb
+    return a.R*v + (I - a.R)*xb
 end
 
 
 function (a::Extrapolator)(A::SparseMatrixCSC, b::Vector{Float64}, xb::Vector{Float64})
 
-    P = gd.Proj
+    P = a.Proj
     Pt = transpose(P)
 
-    Anew = P * A * gd.R * Pt
-    bnew = P*b + P*A*(gd.R - I)*xb
+    Anew = P * A * a.R * Pt
+    bnew = P*b + P*A*(a.R - I)*xb
 
     return Anew, bnew
 end
