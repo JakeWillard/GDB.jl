@@ -2,7 +2,7 @@
 
 module DistributedSolver
 
-export dlinsolve
+export dlinsolve, prbgs
 
 using Distributed
 @everywhere using LinearAlgebra, SparseArrays

@@ -119,3 +119,25 @@ function wakatani_update!(w, phi, n, Dx, Dy, L, Dh, w_ex, n_ex, phi_ex, alpha, k
     w[:,1:2] = w[:,2:3]
     n[:,1:2] = n[:,2:3]
 end
+
+
+function linsolve_timing(N, m, alpha, fraction, Np; Nsolves=10)
+
+    A = spdiagm(0 => rand(N))
+    for i=1:m
+        A += spdiagm(i => rand(N - i)) / alpha^i
+        A += spdiagm(-i => rand(N - i)) / alpha^i
+    end
+    println("created matrix")
+
+    x0 = zeros(N)
+    b = rand(N)
+
+    stat = @timed begin
+        for _=1:Nsolves
+            x = prbgs(A, x0, b; block_fraction=fraction, Np=Np)
+        end
+    end
+
+    return stat.time
+end
