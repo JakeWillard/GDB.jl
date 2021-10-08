@@ -141,3 +141,35 @@ function linsolve_timing(N, m, alpha, fraction, Np; Nsolves=10)
 
     return stat.time
 end
+
+
+function big_matrix_with_pmap(N, m, alpha, Nit)
+
+    A = spdiagm(0 => rand(N))
+    for i=1:m
+        A += spdiagm(i => rand(N - i)) / alpha^i
+        A += spdiagm(-i => rand(N - i)) / alpha^i
+    end
+    B = kron(A, A)
+
+    x = pmap(1:Nit) do i
+        2*B
+        i
+    end
+end
+
+
+function big_matrix_with_darray(N, m, alpha, Nit)
+
+    A = spdiagm(0 => rand(N))
+    for i=1:m
+        A += spdiagm(i => rand(N - i)) / alpha^i
+        A += spdiagm(-i => rand(N - i)) / alpha^i
+    end
+    B = kron(A, A)
+
+    x = DArray((Nit,), workers(), length(workers())) do inds
+        2*A
+        [inds...]
+    end
+end
