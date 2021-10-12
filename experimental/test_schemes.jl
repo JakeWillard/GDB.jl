@@ -121,6 +121,21 @@ function wakatani_update!(w, phi, n, Dx, Dy, L, Dh, w_ex, n_ex, phi_ex, alpha, k
 end
 
 
+function shift_map(theta, l, grd)
+
+    _, proj_js, _ = findnz(grd.Proj)
+    js = Int64[]
+    dat = Float64[]
+
+    for k=1:grd.Nk
+        r = grd.points[:,k]
+        rn = r + l*[cos(theta), sin(theta)]
+    end
+end
+
+
+
+
 function linsolve_timing(N, m, alpha, fraction, Np; Nsolves=10)
 
     A = spdiagm(0 => rand(N))
