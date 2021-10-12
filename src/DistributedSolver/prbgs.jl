@@ -11,7 +11,6 @@ function prbgs(A::SparseMatrixCSC, x0::Vector{Float64}, b::Vector{Float64}; bloc
 
     x = x0[:]
     r = b - A*x
-    println("computed r")
     bnorm = norm(b)
 
     err = norm(r) / bnorm
@@ -22,7 +21,6 @@ function prbgs(A::SparseMatrixCSC, x0::Vector{Float64}, b::Vector{Float64}; bloc
         for slc in picked
             append!(As, [sparse(view(A, :, slc))])
         end
-        println("sliced successfully")
 
         deltas = pmap(As) do M
             M \ r
