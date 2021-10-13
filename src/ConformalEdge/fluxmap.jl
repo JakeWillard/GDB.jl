@@ -28,7 +28,7 @@ function FluxMap(b::Function, Nr, Nt, deltaPhi, ds)
     ts = LinRange(-pi, pi, Nt+1)[1:Nt]
 
     zs = pmap(1:Nr) do i
-        col = zeros(Complex{Float64}, (4, Nt)
+        col = zeros(Complex{Float64}, (4, Nt))
         for j=1:Nt
             x1 = rs[i]*[cos(ts[j]), sin(ts[j]), 0]
             x2 = x1[:]
