@@ -37,7 +37,7 @@ mutable struct LinearProblem{T}
     r :: Vector{T}
 
 end
-function LinearProblem{T}(A, x, b) where {T}
+function LinearProblem{T}(A::SparseMatrixCSC{T}, x::Vector{T}, b::Vector{T}) where {T}
     Adiag = diag(A)
     r = b - A*x
     return LinearProblem{T}(A, Adiag, b, x, r)

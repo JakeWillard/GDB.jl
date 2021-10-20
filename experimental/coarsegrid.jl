@@ -38,3 +38,22 @@ function coarsen_grid(grd::Grid)
     Projc = sparse([1:Nkc...], projc_js[1:Nkc], ones(Nkc), Nkc, _Nxc*_Nyc)
     return Grid(r0, r1, points[:,1:Nkc], Projc, dr, Nkc, _Nxc, _Nyc, Nbuffer, nan_outside_boundaries)
 end
+
+
+function restriction_and_interpolation(xb, finegrid, coarsegrid, extr_c, extr_f)
+
+    Interp_cart, Restr_cart = cartesian_2d_crs(coarsegrid._Nx, coarsegrid._Ny, 4, 4)
+    Interp_i = finegrid.Proj*Interp_cart*transpose(coarsegrid.Proj)
+    Restr_i = coarsegrid.Proj*Restr_cart*transpose(finegrid.Proj)
+    xb_c = Restr_i*xb
+
+    Interp_mat = extr_f.Proj*Interp_i*extr_c.R*transpose(extr_c.Proj)
+    Interp_f = extr_f.Proj*Interp_i*(I-extr_c.R)*xb_c
+
+    Restr_mat = extr_c.Proj*Restr_i*extr_f.R*transpose(extr_f.Proj)
+    Restr_f = extr_c.Proj*Restr_i*(I-extr_f.R)*xb
+
+    Interp = AffineMap{Float64}(Interp_mat, Interp_f)
+    Restr = AffineMap{Float64}(Restr_mat, Restr_f)
+    return Interp, Restr, xb_c
+end
