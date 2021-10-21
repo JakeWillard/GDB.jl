@@ -58,18 +58,6 @@ function Extrapolator(M::Mirror, grd::Grid)
 end
 
 
-function flip_segments(a::Extrapolator, inds)
-
-    R = a.R
-    fac = a.flip_factors[inds]
-    for j=1:size(fac)[1]
-        R = Diagonal(vec(fac[j,:])) * R
-    end
-
-    return Extrapolator(a.Proj, R, a.flip_factors)
-end
-
-
 function make_dirichlet(a::Extrapolator, inds)
 
     factors = a.flip_factors[inds,:]
