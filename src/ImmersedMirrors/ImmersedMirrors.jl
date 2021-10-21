@@ -2,7 +2,7 @@
 module ImmersedMirrors
 
 
-export Grid, function_to_grid, operator_to_grid
+export Grid, coarse_grid, function_to_grid, operator_to_grid
 export Mirror, distance_to_mirror, mirror_image, smoothstep
 export Extrapolator, flip_segments, make_dirichlet
 
