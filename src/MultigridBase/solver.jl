@@ -2,28 +2,47 @@
 
 mutable struct MultigridSolver{T}
 
-    problems :: Vector{LinearProblem{T}}
-    restrictors :: Vector{AffineMap{T}}
-    interpolators :: Vector{AffineMap{T}}
-    _m :: Int64
+    p :: Vector{LinearProblem{T}}  # linear problems
+    r :: Vector{AffineMap{T}}  # restrictors
+    i :: Vector{AffineMap{T}}   # interpolators
+    n :: Int64
 
 end
 function MultigridSolver{T}(L::LinearProblem{T}, max_layers::Int64) where {T}
-    problems = Vector{LinearProblem{T}}(undef, max_layers)
-    restrictors = Vector{AffineMap{T}}(undef, max_layers)
-    interpolators = Vector{AffineMap{T}}(undef, max_layers)
+    p = Vector{LinearProblem{T}}(undef, max_layers)
+    r = Vector{AffineMap{T}}(undef, max_layers-1)
+    i = Vector{AffineMap{T}}(undef, max_layers-1)
 
-    problems[1] = L
-    return MultigridSolver{T}(problems, restrictors, interpolators, 2)
+    p[1] = L
+    return MultigridSolver{T}(p, r, i, 1)
 end
 MultigridSolver(args...) = MultigridSolver{Float64}(args...)
 
 
 function add_layer!(M::MultigridSolver{T}, Restr::AffineMap{T}, Interp::AffineMap{T}) where {T}
 
-    Lc = coarsen_problem!(M.problems[_m-1], Restr, Interp)
-    M.problems[_m] = Lc
-    M.restrictors[_m] = Restr
-    M.interpolators[_m] = Interp
-    M._m += 1
+    Lc = coarsen_problem!(M.p[M.n], Restr, Interp)
+    M.p[M.n+1] = Lc
+    M.r[M.n] = Restr
+    M.i[M.n] = Interp
+    M.n += 1
+end
+
+
+function vcycle!(M::MultigridSolver{T}, nj::Vector{Int64}) where {T}
+
+    # initial smoothing
+    jsmooth!(M.p[1], nj[1])
+
+    for i=2:M.n
+        M.p[i].x[:] = M.r[i-1] * M.p[i-1].x
+        compute_residual!(M.p[i])
+        jsmooth!(M.p[i], nj[i])
+    end
+
+    for i=M.n-1:1
+        M.p[i].x[:] = M.i[i] * M.p[i+1].x
+        compute_residual!(M.p[i])
+        jsmooth!(M.p[i], nj[i])
+    end
 end
