@@ -1,55 +1,55 @@
 
-struct AffineMap{T}
+struct AffineMap
 
-    Mat :: SparseMatrixCSC{T, Int64}
-    f :: Vector{T}
+    Mat :: SparseMatrixCSC{Float64, Int64}
+    f :: Vector{Float64}
 
 end
 
 
-function Base.:*(A::AffineMap{T}, v::Vector{T}) where {T}
+function Base.:*(A::AffineMap, v::Vector)
     A.Mat*v + A.f
 end
 
 
-function Base.:*(M::SparseMatrixCSC{T, Int64}, A::AffineMap{T}) where {T}
-    AffineMap{T}(M*A.Mat, M*A.f)
+function Base.:*(M::SparseMatrixCSC{Float64, Int64}, A::AffineMap)
+    AffineMap(M*A.Mat, M*A.f)
 end
 
-function Base.:*(A::AffineMap{T}, M::SparseMatrixCSC{T, Int64}) where {T}
-    AffineMap{T}(A.Mat*M, A.f)
+function Base.:*(A::AffineMap, M::SparseMatrixCSC{Float64, Int64})
+    AffineMap(A.Mat*M, A.f)
 end
 
 
-function Base.:*(A1::AffineMap{T}, A2::AffineMap{T}) where {T}
+function Base.:*(A1::AffineMap, A2::AffineMap)
     Mat = A1.Mat*A2.Mat
     f = A1.Mat*A2.f + A1.f
-    AffineMap{T}(Mat, f)
+    AffineMap(Mat, f)
 end
 
 
-mutable struct LinearProblem{T}
+mutable struct LinearProblem
 
-    A :: SparseMatrixCSC{T, Int64}
-    Adiag :: Vector{T}
-    b :: Vector{T}
-    x :: Vector{T}
-    r :: Vector{T}
+    A :: SparseMatrixCSC{Float64, Int64}
+    Adiag :: Vector{Float64}
+    b :: Vector{Float64}
+    x :: Vector{Float64}
+    r :: Vector{Float64}
 
 end
-function LinearProblem{T}(A::SparseMatrixCSC{T}, x::Vector{T}, b::Vector{T}) where {T}
+function LinearProblem(A::SparseMatrixCSC, x::Vector{Float64}, b::Vector{Float64})
     Adiag = diag(A)
     r = b - A*x
-    return LinearProblem{T}(A, Adiag, b, x, r)
+    return LinearProblem(A, Adiag, b, x, r)
 end
 
 
-function compute_residual!(L::LinearProblem{T}) where {T}
+function compute_residual!(L::LinearProblem)
     L.r[:] = L.b - L.A*L.x
 end
 
 
-function coarsen_problem!(L::LinearProblem{T}, Restr::AffineMap{T}, Interp::AffineMap{T}) where {T}
+function coarsen_problem!(L::LinearProblem, Restr::AffineMap, Interp::AffineMap)
 
     lhs = Restr * (L.A*Interp)
     rhs = Restr * L.b
@@ -58,11 +58,11 @@ function coarsen_problem!(L::LinearProblem{T}, Restr::AffineMap{T}, Interp::Affi
     b = rhs - lhs.f
     x = zeros(length(b))
 
-    return LinearProblem{T}(A, x, b)
+    return LinearProblem(A, x, b)
 end
 
 
-function jsmooth!(L::LinearProblem{T}, n::Int64) where {T}
+function jsmooth!(L::LinearProblem, n::Int64)
 
     for _=1:n
         L.x[:] += L.r ./ L.Adiag
