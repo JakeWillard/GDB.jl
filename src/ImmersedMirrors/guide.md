@@ -140,7 +140,7 @@ A linear system can be constrained to implicitly satisfy the boundary conditions
     extr = Extrapolator(M::Mirror, grd::Grid)
 
     # define laplacian matrix
-    L = operator_to_grid(grd::Grid) do
+    L = operator_to_grid(grd) do
         Dxx = spdiagm(1 => ones(grd._Nx-1))
         Dxx += spdiagm(-1 => ones(grd._Nx-1))
         Dxx += spdiagm(0 => -2*ones(grd._Nx))
@@ -149,7 +149,10 @@ A linear system can be constrained to implicitly satisfy the boundary conditions
         Dyy += spdiagm(-1 => ones(grd._Ny-1))
         Dyy += spdiagm(0 => -2*ones(grd._Ny))
 
-        kron(Dyy, Dxx) / grd.dr^2
+        Ix = sparse(I, grd._Nx, grd._Nx)
+        Iy = sparse(I, grd._Ny, grd._Ny)
+
+        (kron(Iy, Dxx) + kron(Dyy, Ix)) / grd.dr^2
     end
 
     # right hand side vector
