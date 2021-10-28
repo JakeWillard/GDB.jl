@@ -10,6 +10,7 @@ include("C:/Users/lucas/OneDrive/Documents/GitHub/GDB.jl/src/domain/operators.jl
 include("C:/Users/lucas/OneDrive/Documents/GitHub/GDB.jl/src/domain/interpolation.jl")
 include("C:/Users/lucas/OneDrive/Documents/GitHub/GDB.jl/experimental/LBM.jl")
 include("C:/Users/lucas/OneDrive/Documents/GitHub/GDB.jl/experimental/periodic_derivatives.jl")
+include("C:/Users/lucas/OneDrive/Documents/Dartmouth/Research/Code/LBMEigen.jl")
 
 function thermal_lattice_boltzmann_method(streamtensor, Dx, Dy, Dxx, Dyy, xres, yres, f, g, tau, tauc, deltax, deltat)
     # vector at each point with nine dimensions corresponding to each direction 0-8
