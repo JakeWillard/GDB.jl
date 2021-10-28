@@ -27,8 +27,14 @@ function FluxMap(b::Function, Nr, Nt, deltaPhi, ds)
     rs = LinRange(0, 1, Nr)
     ts = LinRange(-pi, pi, Nt+1)[1:Nt]
 
+    chnl = RemoteChannel(()->Channel{Bool}(), 1)
+    p = Progress(Nr*Nt, desc="Tracing fieldlines... ")
+    @async while take!(chnl)
+        next!(p)
+    end
+
     zs = pmap(1:Nr) do i
-        col = zeros(Complex{Float64}, (4, Nt)
+        col = zeros(Complex{Float64}, (4, Nt))
         for j=1:Nt
             x1 = rs[i]*[cos(ts[j]), sin(ts[j]), 0]
             x2 = x1[:]
@@ -36,13 +42,13 @@ function FluxMap(b::Function, Nr, Nt, deltaPhi, ds)
             ds2 = 0.0
 
             # trace forwards
-            while x1[3] < deltaPhi
+            while abs(x1[3]) < deltaPhi
                 x1 = rk4_step(x1, b, ds)
                 ds1 += ds
             end
 
             # trace backwards
-            while x2[3] < deltaPhi
+            while abs(x2[3]) < deltaPhi
                 x2 = rk4_step(x2, b, -ds)
                 ds2 += ds
             end
@@ -51,6 +57,7 @@ function FluxMap(b::Function, Nr, Nt, deltaPhi, ds)
             z1 = x1[1] + im*x1[2]
             z2 = x2[1] + im*x2[2]
 
+            put!(chnl, true)
             col[:,j] = [z1, z2, ds1, ds2]
         end
         col
@@ -66,16 +73,17 @@ end
 
 function (fm::FluxMap)(z::Complex{Float64})
 
-    r, t = abs(r), angle(z)
-    i = Int64(floor(r / fm.dr))
-    j = Int64(floor((t + pi) / fm.dt))
-    u = r / fm.dr - i
-    v = (t + pi) / fm.dt - j
+    r, t = abs(z), angle(z)
+    i = Int64(floor(r / fm.dr)) + 1
+    j = Int64(floor((t + pi) / fm.dt)) + 1
+    u = r / fm.dr - i + 1
+    v = (t + pi) / fm.dt - j + 1
 
     # bilinear interpolation
-    z1 = [1 - u u] * fm.Z1[i:i+1,j:j+1] * [1 - v, v]
-    z2 = [1 - u u] * fm.Z2[i:i+1,j:j+1] * [1 - v, v]
-    ds1 = [1 - u u] * fm.dS1[i:i+1,j:j+1] * [1 - v, v]
-    ds2 = [1 - u u] * fm.dS2[i:i+1,j:j+1] * [1 - v, v]
+    jmax = (j==size(fm.Z1)[2]) ? 1 : j + 1
+    z1 = dot([1-u, u], fm.Z1[i:i+1,[j, jmax]] * [1 - v, v])
+    z2 = dot([1-u, u], fm.Z2[i:i+1,[j, jmax]] * [1 - v, v])
+    ds1 = dot([1-u, u], fm.dS1[i:i+1,[j, jmax]] * [1 - v, v])
+    ds2 = dot([1-u, u], fm.dS2[i:i+1,[j, jmax]] * [1 - v, v])
     return z1, z2, ds1, ds2
 end
