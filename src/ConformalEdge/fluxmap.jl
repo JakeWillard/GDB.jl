@@ -17,14 +17,15 @@ struct FluxMap
     Z2 :: Matrix{Complex{Float64}}
     dS1 :: Matrix{Float64}
     dS2 :: Matrix{Float64}
+    r0 :: Float64
     dr :: Float64
     dt :: Float64
 end
 
 
-function FluxMap(b::Function, Nr, Nt, deltaPhi, ds)
+function FluxMap(b::Function, r0, Nr, Nt, deltaPhi, ds)
 
-    rs = LinRange(0, 1, Nr)
+    rs = LinRange(r0, 1, Nr)
     ts = LinRange(-pi, pi, Nt+1)[1:Nt]
 
     chnl = RemoteChannel(()->Channel{Bool}(), 1)
@@ -67,17 +68,27 @@ function FluxMap(b::Function, Nr, Nt, deltaPhi, ds)
     dS1 = vcat([c[3:3,:] for c in zs]...)
     dS2 = vcat([c[4:4,:] for c in zs]...)
 
-    return FluxMap(Z1, Z2, dS1, dS2, rs[2]-rs[1], ts[2]-ts[1])
+    # make periodic
+    Z1 = hcat(Z1, Z1[:,1])
+    Z2 = hcat(Z2, Z2[:,1])
+    dS1 = hcat(dS1, dS1[:,1])
+    dS2 = hcat(dS2, dS2[:,1])
+
+    return FluxMap(Z1, Z2, dS1, dS2, r0, rs[2]-rs[1], ts[2]-ts[1])
 end
 
 
 function (fm::FluxMap)(z::Complex{Float64})
 
     r, t = abs(z), angle(z)
-    i = Int64(floor(r / fm.dr)) + 1
-    j = Int64(floor((t + pi) / fm.dt)) + 1
-    u = r / fm.dr - i + 1
+    i = Int64(floor((r - fm.r0) / fm.dr)) + 1
+    j = Int64(floor(((t + pi) / fm.dt))) + 1
+    u = (r - fm.r0) / fm.dr - i + 1
     v = (t + pi) / fm.dt - j + 1
+
+    if (i > size(fm.Z1)[1]) || (j > size(fm.Z2)[2]) || (i < 1)
+        return z, z, NaN, NaN
+    end
 
     # bilinear interpolation
     jmax = (j==size(fm.Z1)[2]) ? 1 : j + 1
@@ -87,3 +98,21 @@ function (fm::FluxMap)(z::Complex{Float64})
     ds2 = dot([1-u, u], fm.dS2[i:i+1,[j, jmax]] * [1 - v, v])
     return z1, z2, ds1, ds2
 end
+
+
+# function plot_arrows(fm::FluxMap, Nr::Int64, Nt::Int64)
+#
+#     rs = LinRange(fm.r0, 0.8, Nr)
+#     ts = LinRange(-pi, pi, Nt+1)[1:Nt]
+#
+#     p = plot()
+#     for r in rs
+#         for t in ts
+#             z1 = r*exp(im*t)
+#             z2, z0 = fm(z1)[1:2]
+#             plot!(p, [z0, z1, z2], arrow=true, legend=false, color=:black, linewidth=0.2)
+#         end
+#     end
+#
+#     return p
+# end

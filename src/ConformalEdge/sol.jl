@@ -1,29 +1,30 @@
 
-struct Hat
-
-    x0 :: Float64
-    x1 :: Float64
-    v :: Float64
-end
-
-
-function (h::Hat)(x::Float64)
-    u = abs(2*(x - (h.x0 + h.x1)/2) / (h.x1 - h.x0))
-    u < 1 ? h.v*(1 - u) : 0
-end
+# struct Hat
+#
+#     x0 :: Float64
+#     x1 :: Float64
+#     v :: Float64
+# end
+#
+#
+# function (h::Hat)(x::Float64)
+#     u = abs(2*(x - (h.x0 + h.x1)/2) / (h.x1 - h.x0))
+#     u < 1 ? h.v*(1 - u) : 0
+# end
 
 
 struct SOL
 
-    psi :: Function
-    b :: Function
     inner_boundary :: Vector{Complex{Float64}}
     outer_boundary :: Vector{Complex{Float64}}
+    psi :: Function
+    qinv :: Function
+    fm :: FluxMap
 
 end
 
 
-function SOL(Nc, r0, divs::Matrix{Float64})
+function SOL(Bpol, Bz, Nc, r0, Nr, Nt, Nz, ds, divs::Matrix{Float64})
 
     # compute inner and outer boundaries
     outer_chain = Complex{Float64}[]
@@ -38,7 +39,7 @@ function SOL(Nc, r0, divs::Matrix{Float64})
 
     # compute boundary value for psi
     psib = Vector{Float64}(undef, 1001)
-    ts = LinRange(-pi, pi, 1002)[1:1001]
+    ts = LinRange(0, 2*pi, 1002)[1:1001]
     for i=1:1001
         for j=1:size(divs)[2]
             if divs[1,j] < ts[i] < divs[2,j]
@@ -56,4 +57,29 @@ function SOL(Nc, r0, divs::Matrix{Float64})
     a = 2*real.(C[2:501]) / 1001
     b = -2*imag.(C[2:501]) / 1001
 
+    # define flux function
+    psi(z) = begin
+        r = abs(z)
+        t = angle(z)
+        if r > 0.95
+            0.0
+        else
+            c0 + Bpol*log(r/0.9) + sum([(r/0.9)^k * (a[k]*cos(k*t) + b[k]*sin(k*t)) for k=1:500])
+        end
+    end
+
+    # define poloidal and total magnetic field
+    gradPsi(r) = ForwardDiff.gradient(r -> psi(r[1] + im*r[2]), r)
+    Bp(r) = begin dpsi = gradPsi(r); [-dpsi[2], dpsi[1]] end
+    B(r) = [Bp(r)..., Bz]
+    bvec(r) = begin Bvec = B(r); Bvec / norm(Bvec) end
+
+    # define 1/q
+    qinv(z) = norm(Bp([real(z), imag(z)])) / Bz
+    # return qinv, psi
+
+    # compute flux map
+    fm = FluxMap(bvec, 0.95*r0, Nr, Nt, 2*pi/Nz, ds)
+
+    return SOL(inner_chain, outer_chain, psi, qinv, fm)
 end
