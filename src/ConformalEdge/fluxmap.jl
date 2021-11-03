@@ -20,6 +20,7 @@ struct FluxMap
     r0 :: Float64
     dr :: Float64
     dt :: Float64
+    deltaPhi :: Float64
 end
 
 
@@ -74,7 +75,7 @@ function FluxMap(b::Function, r0, Nr, Nt, deltaPhi, ds)
     dS1 = hcat(dS1, dS1[:,1])
     dS2 = hcat(dS2, dS2[:,1])
 
-    return FluxMap(Z1, Z2, dS1, dS2, r0, rs[2]-rs[1], ts[2]-ts[1])
+    return FluxMap(Z1, Z2, dS1, dS2, r0, rs[2]-rs[1], ts[2]-ts[1], deltaPhi)
 end
 
 
@@ -86,8 +87,8 @@ function (fm::FluxMap)(z::Complex{Float64})
     u = (r - fm.r0) / fm.dr - i + 1
     v = (t + pi) / fm.dt - j + 1
 
-    if (i > size(fm.Z1)[1]) || (j > size(fm.Z2)[2]) || (i < 1)
-        return z, z, NaN, NaN
+    if (i > size(fm.Z1)[1]-1) || (j > size(fm.Z2)[2]-1) || (i < 1)
+        return z, z, fm.deltaPhi, fm.deltaPhi
     end
 
     # bilinear interpolation
