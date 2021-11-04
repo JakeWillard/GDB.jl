@@ -61,10 +61,11 @@ function SOL(Bpol, Bz, Nc, r0, Nr, Nt, Nz, ds, divs::Matrix{Float64})
     psi(z) = begin
         r = abs(z)
         t = angle(z)
-        if r > 0.95
-            0.0
-        else
+
+        if r < 0.9
             c0 + Bpol*log(r/0.9) + sum([(r/0.9)^k * (a[k]*cos(k*t) + b[k]*sin(k*t)) for k=1:500])
+        else
+            c0 + Bpol*log(r/0.9) + sum([(r/0.9)^(-k) * (a[k]*cos(k*t) + b[k]*sin(k*t)) for k=1:500])
         end
     end
 
@@ -76,7 +77,6 @@ function SOL(Bpol, Bz, Nc, r0, Nr, Nt, Nz, ds, divs::Matrix{Float64})
 
     # define 1/q
     qinv(z) = norm(Bp([real(z), imag(z)])) / Bz
-    # return qinv, psi
 
     # compute flux map
     fm = FluxMap(bvec, 0.95*r0, Nr, Nt, 2*pi/Nz, ds)
