@@ -62,10 +62,11 @@ function SOL(Bpol, Bz, Nc, r0, Nr, Nt, Nz, ds, divs::Matrix{Float64})
         r = abs(z)
         t = angle(z)
 
+        kmax = minimum([500, abs(Int64(ceil(8 / log10(r/0.9))))])
         if r < 0.9
-            c0 + Bpol*log(r/0.9) + sum([(r/0.9)^k * (a[k]*cos(k*t) + b[k]*sin(k*t)) for k=1:500])
+            c0 + Bpol*log(r/0.9) + sum([(r/0.9)^k * (a[k]*cos(k*t) + b[k]*sin(k*t)) for k=1:kmax])
         else
-            c0 + Bpol*log(r/0.9) + sum([(r/0.9)^(-k) * (a[k]*cos(k*t) + b[k]*sin(k*t)) for k=1:500])
+            c0 + Bpol*log(r/0.9) + sum([(r/0.9)^(-k) * (a[k]*cos(k*t) + b[k]*sin(k*t)) for k=1:kmax])
         end
     end
 
