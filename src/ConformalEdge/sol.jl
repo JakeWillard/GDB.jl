@@ -29,7 +29,7 @@ function SOL(Bpol, Bz, Nc, r0, Nr, Nt, Nz, ds, divs::Matrix{Float64})
     # compute inner and outer boundaries
     outer_chain = Complex{Float64}[]
     inner_chain = Vector{Complex{Float64}}(undef, Nc)
-    thetas = LinRange(-pi, pi, Nc+1)[1:Nc]
+    thetas = LinRange(0, 2*pi, Nc+1)[1:Nc]
     for i=1:Nc
         if !any([divs[1,j] < thetas[i] < divs[2,j] for j=1:size(divs)[2]])
             outer_chain = [outer_chain; [0.95*exp(im*thetas[i])]]
