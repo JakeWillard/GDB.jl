@@ -92,13 +92,19 @@ end
 
 function distance_to_mirror(x, y, M::Mirror)
 
-    # get the closest vertex, return distance to arm represented by that vertex
-    _, k = findmin([norm([x,y] - M.verts[:,i]) for i=1:size(M.verts)[2]])
-    vert0 = M.arms[:,1,k]
-    vert1 = M.arms[:,2,k]
-    vert2 = M.arms[:,3,k]
+    # find nearest arm, return distance to nearest arm
+    dists = [distance_to_arm(x, y, M.arms[:,1,k], M.arms[:,2,k], M.arms[:,3,k]) for k=1:size(M.arms)[3]]
+    _, kmin = findmin(dists .^ 2)
 
-    return distance_to_arm(x, y, vert0, vert1, vert2), k
+    return dists[kmin], kmin
+
+    # # get the closest vertex, return distance to arm represented by that vertex
+    # _, k = findmin([norm([x,y] - M.verts[:,i]) for i=1:size(M.verts)[2]])
+    # vert0 = M.arms[:,1,k]
+    # vert1 = M.arms[:,2,k]
+    # vert2 = M.arms[:,3,k]
+    #
+    # return distance_to_arm(x, y, vert0, vert1, vert2), k
 end
 
 
