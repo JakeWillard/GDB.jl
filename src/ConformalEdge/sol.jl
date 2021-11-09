@@ -1,25 +1,12 @@
 
-# struct Hat
-#
-#     x0 :: Float64
-#     x1 :: Float64
-#     v :: Float64
-# end
-#
-#
-# function (h::Hat)(x::Float64)
-#     u = abs(2*(x - (h.x0 + h.x1)/2) / (h.x1 - h.x0))
-#     u < 1 ? h.v*(1 - u) : 0
-# end
-
 
 struct SOL
 
     inner_boundary :: Vector{Complex{Float64}}
     outer_boundary :: Vector{Complex{Float64}}
     psi :: Function
-    qinv :: Function
-    fm :: FluxMap
+    iota :: Function
+    bvec :: Function
 
 end
 
@@ -62,11 +49,11 @@ function SOL(Bpol, Bz, Nc, r0, Nr, Nt, Nz, ds, divs::Matrix{Float64})
         r = abs(z)
         t = angle(z)
 
-        kmax = minimum([500, abs(Int64(ceil(8 / log10(r/0.9))))])
         if r < 0.9
+            kmax = minimum([500, abs(Int64(ceil(8 / log10(r/0.9))))])
             c0 + Bpol*log(r/0.9) + sum([(r/0.9)^k * (a[k]*cos(k*t) + b[k]*sin(k*t)) for k=1:kmax])
         else
-            c0 + Bpol*log(r/0.9) + sum([(r/0.9)^(-k) * (a[k]*cos(k*t) + b[k]*sin(k*t)) for k=1:kmax])
+            c0 + Bpol*log(r/0.9) + sum([(r/0.9)^(-k) * (a[k]*cos(k*t) + b[k]*sin(k*t)) for k=1:500])
         end
     end
 
@@ -77,10 +64,18 @@ function SOL(Bpol, Bz, Nc, r0, Nr, Nt, Nz, ds, divs::Matrix{Float64})
     bvec(r) = begin Bvec = B(r); Bvec / norm(Bvec) end
 
     # define 1/q
-    qinv(z) = norm(Bp([real(z), imag(z)])) / Bz
+    iota(z) = 2*pi*norm(Bp([real(z), imag(z)])) / Bz
 
-    # compute flux map
-    fm = FluxMap(bvec, 0.95*r0, Nr, Nt, 2*pi/Nz, ds)
+    return SOL(inner_chain, outer_chain, psi, iota, bvec)
+end
 
-    return SOL(inner_chain, outer_chain, psi, qinv, fm)
+
+function fluxmap(z::ComplexF64, dPhi::Float64, ds::Float64, sol::SOL)
+
+    points, dS = trace_fieldline([real(z), imag(z), 0.0], sol.bvec, r -> sol.psi(r[1] + im*r[2]), ds) do r
+        abs(r[3]) > dPhi
+    end
+    z_final = Complex(points[1:2,end]...)
+
+    return z_final, dS
 end
