@@ -72,3 +72,19 @@ function trace_fieldline(stop_condition::Function, r0::Vector{Float64}, b::Funct
 
     return hcat(points...), deltaS
 end
+
+function trace_fieldline_dist(r0::Vector{Float64}, b::Function, ds::Float64, dlim::Float64)
+    r = r0[:]
+    dS = 0.0
+
+    points = Vector{Float64}[r0]
+
+    while dS < dlim
+        rnew = rk4_step(r, b, ds)
+        dS += norm(rnew - r)
+        r[:] = rnew
+        append!(points, [rnew])
+    end
+
+    return hcat(points...), dS
+end
