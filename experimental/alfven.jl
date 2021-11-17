@@ -1,20 +1,91 @@
+function spline2d(xr, yr, mx, my)
 
+    out = zeros(Float64, mx*my)
 
+    for i=1:mx
+        for j=1:my
+            k = i + (j-1)*mx
+            a = xr^(i-1) / factorial(i-1)
+            b = yr^(j-1) / factorial(j-1)
+            out[k] = a * b
+        end
+    end
 
-
-function bilinear_coefficients(x, y, grd::Grid)
-
-    i = Int64(floor((x - grd.r0[1]) / grd.dr)) + 1 + grd._Nbuffer
-    j = Int64(floor((y - grd.r0[2]) / grd.dr)) + 1 + grd._Nbuffer
-    u = rem(x - grd.r0[1], grd.dr) / grd.dr
-    v = rem(y - grd.r0[2], grd.dr) / grd.dr
-
-    k0 = i + (j - 1)*grd._Nx
-    ks = Int64[k0, k0+grd._Nx, k0+1, k0+grd._Nx+1]
-    C = [(1 - u)*(1 - v), (1 - u)*v, u*(1 - v), u*v]
-
-    return ks, C
+    return out
 end
+
+
+function stencil2d(mx, my)
+
+    # (i,j) indices for center point
+    ic = Int(ceil(mx/2.0))
+    jc = Int(ceil(my/2.0))
+
+    M = zeros(Float64, (mx*my, mx*my))
+
+    for i=1:mx
+        for j=1:my
+            k = i + (j-1)*mx
+            M[k,:] = spline2d(i-ic, j-jc, mx, my)
+        end
+    end
+
+    return Matrix(transpose(inv(M)))
+end
+
+
+function interpolation_row(x, y, mx, my, MinvT, grd::Grid)
+
+    x0, y0 = grd.r0
+    dx = grd.dr
+    dy = grd.dr
+    Nx = grd._Nx
+    Ny = grd._Ny
+
+    # (i,j) indices for center point of stencil
+    ics = Int(ceil(mx/2.0))
+    jcs = Int(ceil(my/2.0))
+
+    # indices for center point in grid
+    # NOTE: the addition of 1e-5 before calling floor is to compensate for annoying floating point imprecision.
+    icg = Int(floor((x - x0)/dx + 1e-5)) + 1 + grd._Nbuffer
+    jcg = Int(floor((y - y0)/dy + 1e-5)) + 1 + grd._Nbuffer
+
+    # values for row
+    xr = (x - x0)/dx - (icg - 1 - grd._Nbuffer)
+    yr = (y - y0)/dy - (jcg - 1 - grd._Nbuffer)
+    spline = spline2d(xr, yr, mx, my)
+    row_dat = MinvT * spline
+
+    # collective index for first nonzero element of output
+    k0 = (icg - ics + 1) + (jcg - jcs)*Nx
+
+    # indices for nonzero elements of row
+    row_js = zeros(Int, mx*my)
+    for i=1:mx
+        for j=1:my
+            row_js[i+(j-1)*mx] = k0 + (i-1) + (j-1)*Nx
+        end
+    end
+
+    return row_dat, row_js
+end
+
+
+
+# function bilinear_coefficients(x, y, grd::Grid)
+#
+#     i = Int64(floor((x - grd.r0[1]) / grd.dr + 1e-5)) + 1 + grd._Nbuffer
+#     j = Int64(floor((y - grd.r0[2]) / grd.dr + 1e-5)) + 1 + grd._Nbuffer
+#     u = (rem(x - grd.r0[1], grd.dr) + 1e-5) / grd.dr
+#     v = (rem(y - grd.r0[2], grd.dr) + 1e-5) / grd.dr
+#
+#     k0 = i + (j - 1)*grd._Nx
+#     ks = Int64[k0, k0+grd._Nx, k0+1, k0+grd._Nx+1]
+#     C = [(1 - u)*(1 - v), (1 - u)*v, u*(1 - v), u*v]
+#
+#     return ks, C
+# end
 
 
 function parallel_laplacian(q::Float64, Nz::Int64, grd::Grid)
@@ -24,6 +95,8 @@ function parallel_laplacian(q::Float64, Nz::Int64, grd::Grid)
     dats = Float64[]
 
     W = exp(im*2*pi/(q*Nz))
+    m = 2
+    MinvT = stencil2d(m, m)
 
     for k=1:grd.Nk
 
@@ -32,20 +105,30 @@ function parallel_laplacian(q::Float64, Nz::Int64, grd::Grid)
         z_bck = z / W
         ds = abs(z)*2*pi/(q*Nz)
 
-        ks, C = bilinear_coefficients(real(z), imag(z), grd)
-        is = [is; k*ones(Int64, 4)]
-        js = [js; ks]
-        dats = [dats; -2*C / ds^2]
+        row_dat, row_js = interpolation_row(real(z), imag(z), m, m, MinvT, grd)
+        is = [is; k*ones(Int64, m^2)]
+        js = [js; row_js]
+        dats = [dats; -2*row_dat / ds^2]
 
-        ks, C = bilinear_coefficients(real(z_fwd), imag(z_fwd), grd)
-        is = [is; k*ones(Int64, 4)]
-        js = [js; ks]
-        dats = [dats; C / ds^2]
+        row_dat, row_js = interpolation_row(real(z_fwd), imag(z_fwd), m, m, MinvT, grd)
+        is = [is; k*ones(Int64, m^2)]
+        js = [js; row_js]
+        dats = [dats; row_dat / ds^2]
 
-        ks, C = bilinear_coefficients(real(z_bck), imag(z_bck), grd)
-        is = [is; k*ones(Int64, 4)]
-        js = [js; ks]
-        dats = [dats; C / ds^2]
+        row_dat, row_js = interpolation_row(real(z_bck), imag(z_bck), m, m, MinvT, grd)
+        is = [is; k*ones(Int64, m^2)]
+        js = [js; row_js]
+        dats = [dats; row_dat / ds^2]
+
+        # ks, C = bilinear_coefficients(real(z_fwd), imag(z_fwd), grd)
+        # is = [is; k*ones(Int64, 4)]
+        # js = [js; ks]
+        # dats = [dats; C / ds^2]
+        #
+        # ks, C = bilinear_coefficients(real(z_bck), imag(z_bck), grd)
+        # is = [is; k*ones(Int64, 4)]
+        # js = [js; ks]
+        # dats = [dats; C / ds^2]
 
     end
 
