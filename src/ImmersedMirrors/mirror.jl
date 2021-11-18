@@ -150,3 +150,16 @@ function smoothstep(x, y, s0, ds, M::Mirror)
     u = (distance_to_mirror(x, y, M)[1] - s0) / ds
     return (u < 0) ? 0.0 : ((0 < u < 1) ? 3*u^2 - 2*u^3 : 1.0)
 end
+
+
+@recipe function f(M::Mirror)
+
+    legend --> false
+    seriescolor --> :black
+    linewidth --> 3
+    aspect_ratio --> :equal
+
+    x = M.arms[1,:,:]
+    y = M.arms[2,:,:]
+    x, y
+end
